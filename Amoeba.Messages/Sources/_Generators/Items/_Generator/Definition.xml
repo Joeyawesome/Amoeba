@@ -1,5 +1,20 @@
 <Config>
 
+    <Class Name="MessageCondition">
+        <Properties>
+            <Item Type="Signature" Name="AuthorSignature" />
+            <Item Type="DateTime" Name="CreationTime" />
+        </Properties>
+    </Class>
+
+    <Class Name="ConnectionFilter">
+        <Properties>
+            <Item Type="string" Name="Scheme" />
+            <Item Type="ConnectionType" Name="Type" />
+            <Item Type="string" Name="ProxyUri" />
+        </Properties>
+    </Class>
+
     <Class Name="CheckBlocksProgressReport">
         <Properties>
             <Item Type="long" Name="BadCount" />

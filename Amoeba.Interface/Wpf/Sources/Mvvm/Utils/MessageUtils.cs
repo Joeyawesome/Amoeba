@@ -6,7 +6,7 @@ using Amoeba.Messages;
 
 namespace Amoeba.Interface
 {
-    static class MessageUtils
+    static class ItemUtils
     {
         public static string ToInfoMessage(Tag tag)
         {

@@ -210,6 +210,46 @@ namespace Amoeba.Service
             }
         }
 
+        public Task<BroadcastProfileMessage> GetProfile(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return _messageManager.GetProfile(signature, creationTimeLowerLimit);
+            }
+        }
+
+        public Task<BroadcastStoreMessage> GetStore(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return _messageManager.GetStore(signature, creationTimeLowerLimit);
+            }
+        }
+
+        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, int messageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return _messageManager.GetUnicastCommentMessages(signature, agreementPrivateKey, messageCountUpperLimit, conditions);
+            }
+        }
+
+        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, int trustMessageCountUpperLimit, int untrustMessageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return _messageManager.GetMulticastCommentMessages(tag, trustMessageCountUpperLimit, untrustMessageCountUpperLimit, conditions);
+            }
+        }
+
         public Task SetProfile(ProfileContent profile, DigitalSignature digitalSignature, CancellationToken token)
         {
             this.Check();
@@ -247,46 +287,6 @@ namespace Amoeba.Service
             lock (_lockObject)
             {
                 return _messageManager.Upload(tag, comment, digitalSignature, miningTime, token);
-            }
-        }
-
-        public Task<BroadcastProfileMessage> GetProfile(Signature signature, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return _messageManager.GetProfile(signature);
-            }
-        }
-
-        public Task<BroadcastStoreMessage> GetStore(Signature signature, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return _messageManager.GetStore(signature);
-            }
-        }
-
-        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return _messageManager.GetUnicastCommentMessages(signature, agreementPrivateKey);
-            }
-        }
-
-        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return _messageManager.GetMulticastCommentMessages(tag);
             }
         }
 

@@ -24,7 +24,7 @@ namespace Amoeba.Service
         public DateTime CreationTime
         {
             get => _creationTime;
-            private set => _creationTime = value.Trim();
+            private set => _creationTime = value.Normalize();
         }
         [JsonProperty]
         public IReadOnlyList<Hash> Hashes { get; }
@@ -71,7 +71,7 @@ namespace Amoeba.Service
         public DateTime UpdateTime
         {
             get => _updateTime;
-            set => _updateTime = value.Trim();
+            set => _updateTime = value.Normalize();
         }
         public override bool Equals(ClusterInfo target)
         {
@@ -175,7 +175,7 @@ namespace Amoeba.Service
         public DateTime CreationTime
         {
             get => _creationTime;
-            private set => _creationTime = value.Trim();
+            private set => _creationTime = value.Normalize();
         }
         [JsonProperty]
         public TimeSpan LifeSpan { get; }
@@ -264,3 +264,4 @@ namespace Amoeba.Service
     }
 
 }
+

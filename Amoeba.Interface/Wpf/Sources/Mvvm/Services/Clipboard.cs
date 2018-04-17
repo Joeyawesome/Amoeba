@@ -382,7 +382,7 @@ namespace Amoeba.Interface
                 foreach (var seed in seeds)
                 {
                     sb.AppendLine(AmoebaConverter.ToSeedString(seed));
-                    sb.AppendLine(MessageUtils.ToInfoMessage(seed));
+                    sb.AppendLine(ItemUtils.ToInfoMessage(seed));
                     sb.AppendLine();
                 }
 

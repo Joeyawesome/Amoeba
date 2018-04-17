@@ -504,6 +504,10 @@
       <Project>{cc9c486e-838d-478e-a89b-79dfc5524274}</Project>
       <Name>Omnius.Serialization</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\Omnius\Omnius.Utils\Omnius.Utils.csproj">
+      <Project>{27ab28c6-bf4f-433d-9369-cfd66185e4f2}</Project>
+      <Name>Omnius.Utils</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Omnius\Omnius.Wpf\Omnius.Wpf.csproj">
       <Project>{4636e8e7-cea8-48f4-bbd8-dddc2e20c5fa}</Project>
       <Name>Omnius.Wpf</Name>
@@ -530,7 +534,6 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup />
-  <Import Project="..\..\Omnius\Omnius.Utils\Omnius.Utils.projitems" Label="Shared" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -2,7 +2,7 @@
   "profiles": {
     "Amoeba.Daemon": {
       "commandName": "Project",
-      "commandLineArgs": "-c ..\\..\\Config\\Service.toml"
+      "commandLineArgs": "E:\\Works\\Test"
     }
   }
 }

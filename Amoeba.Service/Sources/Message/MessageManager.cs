@@ -21,13 +21,6 @@ namespace Amoeba.Service
 
         private LockedHashSet<Signature> _searchSignatures = new LockedHashSet<Signature>();
 
-        private VolatileHashDictionary<BroadcastMetadata, BroadcastProfileMessage> _cache_Profiles;
-        private VolatileHashDictionary<BroadcastMetadata, BroadcastStoreMessage> _cache_Stores;
-        private VolatileHashDictionary<Signature, LockedHashDictionary<UnicastMetadata, UnicastCommentMessage>> _cache_MailMessages;
-        private VolatileHashDictionary<Tag, LockedHashDictionary<MulticastMetadata, MulticastCommentMessage>> _cache_ChatMessages;
-
-        private WatchTimer _watchTimer;
-
         private Random _random = new Random();
 
         private readonly object _lockObject = new object();
@@ -40,26 +33,7 @@ namespace Amoeba.Service
 
             _settings = new Settings(configPath);
 
-            _cache_Profiles = new VolatileHashDictionary<BroadcastMetadata, BroadcastProfileMessage>(new TimeSpan(0, 30, 0));
-            _cache_Stores = new VolatileHashDictionary<BroadcastMetadata, BroadcastStoreMessage>(new TimeSpan(0, 30, 0));
-            _cache_MailMessages = new VolatileHashDictionary<Signature, LockedHashDictionary<UnicastMetadata, UnicastCommentMessage>>(new TimeSpan(0, 30, 0));
-            _cache_ChatMessages = new VolatileHashDictionary<Tag, LockedHashDictionary<MulticastMetadata, MulticastCommentMessage>>(new TimeSpan(0, 30, 0));
-
-            _watchTimer = new WatchTimer(this.WatchTimer);
-            _watchTimer.Start(new TimeSpan(0, 0, 30));
-
             _coreManager.GetLockSignaturesEvent = (_) => this.Config.SearchSignatures;
-        }
-
-        private void WatchTimer()
-        {
-            lock (_lockObject)
-            {
-                _cache_Profiles.Update();
-                _cache_Stores.Update();
-                _cache_MailMessages.Update();
-                _cache_ChatMessages.Update();
-            }
         }
 
         public MessageConfig Config
@@ -82,20 +56,13 @@ namespace Amoeba.Service
             }
         }
 
-        public Task<BroadcastProfileMessage> GetProfile(Signature signature)
+        public Task<BroadcastProfileMessage> GetProfile(Signature signature, DateTime? creationTimeLowerLimit)
         {
             if (signature == null) throw new ArgumentNullException(nameof(signature));
 
             var broadcastMetadata = _coreManager.GetBroadcastMetadata(signature, "Profile");
             if (broadcastMetadata == null) return Task.FromResult<BroadcastProfileMessage>(null);
-
-            // Cache
-            {
-                if (_cache_Profiles.TryGetValue(broadcastMetadata, out var result))
-                {
-                    return Task.FromResult(result);
-                }
-            }
+            if (creationTimeLowerLimit != null && broadcastMetadata.CreationTime <= creationTimeLowerLimit) return Task.FromResult<BroadcastProfileMessage>(null);
 
             return Task.Run(() =>
             {
@@ -112,8 +79,6 @@ namespace Amoeba.Service
                         broadcastMetadata.CreationTime,
                         content);
 
-                    _cache_Profiles[broadcastMetadata] = result;
-
                     return result;
                 }
                 catch (Exception e)
@@ -125,20 +90,13 @@ namespace Amoeba.Service
             });
         }
 
-        public Task<BroadcastStoreMessage> GetStore(Signature signature)
+        public Task<BroadcastStoreMessage> GetStore(Signature signature, DateTime? creationTimeLowerLimit)
         {
             if (signature == null) throw new ArgumentNullException(nameof(signature));
 
             var broadcastMetadata = _coreManager.GetBroadcastMetadata(signature, "Store");
             if (broadcastMetadata == null) return Task.FromResult<BroadcastStoreMessage>(null);
-
-            // Cache
-            {
-                if (_cache_Stores.TryGetValue(broadcastMetadata, out var result))
-                {
-                    return Task.FromResult(result);
-                }
-            }
+            if (creationTimeLowerLimit != null && broadcastMetadata.CreationTime <= creationTimeLowerLimit) return Task.FromResult<BroadcastStoreMessage>(null);
 
             return Task.Run(() =>
             {
@@ -155,8 +113,6 @@ namespace Amoeba.Service
                         broadcastMetadata.CreationTime,
                         content);
 
-                    _cache_Stores[broadcastMetadata] = result;
-
                     return result;
                 }
                 catch (Exception e)
@@ -168,7 +124,8 @@ namespace Amoeba.Service
             });
         }
 
-        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey)
+        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey,
+            int messageCountUpperLimit, IEnumerable<MessageCondition> conditions)
         {
             if (signature == null) throw new ArgumentNullException(nameof(signature));
             if (agreementPrivateKey == null) throw new ArgumentNullException(nameof(agreementPrivateKey));
@@ -177,50 +134,44 @@ namespace Amoeba.Service
             {
                 try
                 {
-                    var results = new List<UnicastCommentMessage>();
-
-                    var trusts = new List<UnicastMetadata>();
-
-                    foreach (var unicastMetadata in _coreManager.GetUnicastMetadatas(signature, "MailMessage"))
+                    var filter = new Dictionary<Signature, HashSet<DateTime>>();
                     {
-                        if (_searchSignatures.Contains(unicastMetadata.Certificate.GetSignature()))
+                        foreach (var item in conditions)
                         {
-                            trusts.Add(unicastMetadata);
+                            filter.GetOrAdd(item.AuthorSignature, (_) => new HashSet<DateTime>()).Add(item.CreationTime);
                         }
                     }
 
-                    trusts.Sort((x, y) => y.CreationTime.CompareTo(x.CreationTime));
-
-                    foreach (var unicastMetadata in trusts.Take(1024))
+                    var trustedMetadatas = new List<UnicastMetadata>();
                     {
-                        var dic = _cache_MailMessages.GetOrAdd(unicastMetadata.Signature, (_) => new LockedHashDictionary<UnicastMetadata, UnicastCommentMessage>());
-
-                        // Cache
+                        foreach (var unicastMetadata in _coreManager.GetUnicastMetadatas(signature, "MailMessage"))
                         {
-                            if (dic.TryGetValue(unicastMetadata, out var result))
-                            {
-                                results.Add(result);
+                            if (!_searchSignatures.Contains(unicastMetadata.Certificate.GetSignature())) continue;
 
-                                continue;
-                            }
+                            trustedMetadatas.Add(unicastMetadata);
                         }
 
-                        {
-                            var stream = _coreManager.VolatileGetStream(unicastMetadata.Metadata, 1024 * 1024 * 1);
-                            if (stream == null) continue;
+                        trustedMetadatas.Sort((x, y) => y.CreationTime.CompareTo(x.CreationTime));
+                    }
 
-                            var result = new UnicastCommentMessage(
-                                unicastMetadata.Signature,
-                                unicastMetadata.Certificate.GetSignature(),
-                                unicastMetadata.CreationTime,
-                                ContentConverter.FromCryptoStream<CommentContent>(stream, agreementPrivateKey, 0));
+                    var results = new List<UnicastCommentMessage>();
 
-                            if (result.Value == null) continue;
+                    foreach (var unicastMetadata in trustedMetadatas.Take(messageCountUpperLimit))
+                    {
+                        if (filter.TryGetValue(unicastMetadata.Certificate.GetSignature(), out var hashSet) && hashSet.Contains(unicastMetadata.CreationTime)) continue;
 
-                            dic[unicastMetadata] = result;
+                        var stream = _coreManager.VolatileGetStream(unicastMetadata.Metadata, 1024 * 1024 * 1);
+                        if (stream == null) continue;
 
-                            results.Add(result);
-                        }
+                        var result = new UnicastCommentMessage(
+                            unicastMetadata.Signature,
+                            unicastMetadata.Certificate.GetSignature(),
+                            unicastMetadata.CreationTime,
+                            ContentConverter.FromCryptoStream<CommentContent>(stream, agreementPrivateKey, 0));
+
+                        if (result.Value == null) continue;
+
+                        results.Add(result);
                     }
 
                     return (IEnumerable<UnicastCommentMessage>)results.ToArray();
@@ -234,7 +185,8 @@ namespace Amoeba.Service
             });
         }
 
-        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag)
+        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag,
+            int trustMessageCountUpperLimit, int untrustMessageCountUpperLimit, IEnumerable<MessageCondition> conditions)
         {
             if (tag == null) throw new ArgumentNullException(nameof(tag));
 
@@ -244,67 +196,60 @@ namespace Amoeba.Service
             {
                 try
                 {
-                    var results = new List<MulticastCommentMessage>();
-
-                    var trusts = new List<MulticastMetadata>();
-                    var untrusts = new List<MulticastMetadata>();
-
-                    foreach (var multicastMetadata in _coreManager.GetMulticastMetadatas(tag, "ChatMessage"))
+                    var filter = new Dictionary<Signature, HashSet<DateTime>>();
                     {
-                        if (_searchSignatures.Contains(multicastMetadata.Certificate.GetSignature()))
+                        foreach (var item in conditions)
                         {
-                            trusts.Add(multicastMetadata);
-                        }
-                        else
-                        {
-                            if ((now - multicastMetadata.CreationTime).TotalDays > 7) continue;
-
-                            untrusts.Add(multicastMetadata);
+                            filter.GetOrAdd(item.AuthorSignature, (_) => new HashSet<DateTime>()).Add(item.CreationTime);
                         }
                     }
 
-                    trusts.Sort((x, y) => y.CreationTime.CompareTo(x.CreationTime));
-                    untrusts.Sort((x, y) =>
+                    var trustedMetadatas = new List<MulticastMetadata>();
+                    var untrustedMetadatas = new List<MulticastMetadata>();
                     {
-                        int c;
-                        if (0 != (c = y.Cost.CashAlgorithm.CompareTo(x.Cost.CashAlgorithm))) return c;
-                        if (0 != (c = y.Cost.Value.CompareTo(x.Cost.Value))) return c;
-
-                        return y.CreationTime.CompareTo(x.CreationTime);
-                    });
-
-                    foreach (var multicastMetadata in CollectionUtils.Unite(trusts.Take(1024), untrusts.Take(1024)))
-                    {
-                        var dic = _cache_ChatMessages.GetOrAdd(multicastMetadata.Tag, (_) => new LockedHashDictionary<MulticastMetadata, MulticastCommentMessage>());
-
-                        // Cache
+                        foreach (var multicastMetadata in _coreManager.GetMulticastMetadatas(tag, "ChatMessage"))
                         {
-                            if (dic.TryGetValue(multicastMetadata, out var result))
+                            if (_searchSignatures.Contains(multicastMetadata.Certificate.GetSignature()))
                             {
-                                results.Add(result);
-
-                                continue;
+                                trustedMetadatas.Add(multicastMetadata);
+                            }
+                            else
+                            {
+                                untrustedMetadatas.Add(multicastMetadata);
                             }
                         }
 
+                        trustedMetadatas.Sort((x, y) => y.CreationTime.CompareTo(x.CreationTime));
+                        untrustedMetadatas.Sort((x, y) =>
                         {
-                            var stream = _coreManager.VolatileGetStream(multicastMetadata.Metadata, 1024 * 1024 * 1);
-                            if (stream == null) continue;
+                            int c;
+                            if (0 != (c = y.Cost.CashAlgorithm.CompareTo(x.Cost.CashAlgorithm))) return c;
+                            if (0 != (c = y.Cost.Value.CompareTo(x.Cost.Value))) return c;
 
-                            var content = ContentConverter.FromStream<CommentContent>(stream, 0);
-                            if (content == null) continue;
+                            return y.CreationTime.CompareTo(x.CreationTime);
+                        });
+                    }
 
-                            var result = new MulticastCommentMessage(
-                                multicastMetadata.Tag,
-                                multicastMetadata.Certificate.GetSignature(),
-                                multicastMetadata.CreationTime,
-                                multicastMetadata.Cost,
-                                content);
+                    var results = new List<MulticastCommentMessage>();
 
-                            dic[multicastMetadata] = result;
+                    foreach (var multicastMetadata in CollectionUtils.Unite(trustedMetadatas.Take(trustMessageCountUpperLimit), untrustedMetadatas.Take(untrustMessageCountUpperLimit)))
+                    {
+                        if (filter.TryGetValue(multicastMetadata.Certificate.GetSignature(), out var hashSet) && hashSet.Contains(multicastMetadata.CreationTime)) continue;
 
-                            results.Add(result);
-                        }
+                        var stream = _coreManager.VolatileGetStream(multicastMetadata.Metadata, 1024 * 1024 * 1);
+                        if (stream == null) continue;
+
+                        var content = ContentConverter.FromStream<CommentContent>(stream, 0);
+                        if (content == null) continue;
+
+                        var result = new MulticastCommentMessage(
+                            multicastMetadata.Tag,
+                            multicastMetadata.Certificate.GetSignature(),
+                            multicastMetadata.CreationTime,
+                            multicastMetadata.Cost,
+                            content);
+
+                        results.Add(result);
                     }
 
                     return (IEnumerable<MulticastCommentMessage>)results.ToArray();
@@ -419,19 +364,7 @@ namespace Amoeba.Service
 
             if (disposing)
             {
-                if (_watchTimer != null)
-                {
-                    try
-                    {
-                        _watchTimer.Dispose();
-                    }
-                    catch (Exception)
-                    {
 
-                    }
-
-                    _watchTimer = null;
-                }
             }
         }
     }

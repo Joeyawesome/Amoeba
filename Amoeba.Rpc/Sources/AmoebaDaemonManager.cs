@@ -217,29 +217,29 @@ namespace Amoeba.Rpc
                                     }
                                 case AmoebaFunctionType.GetProfile:
                                     {
-                                        var signature = JsonUtils.Load<Signature>(requestStream);
-                                        var result = _serviceManager.GetProfile(signature, token).Result;
+                                        var arguments = JsonUtils.Load<(Signature, DateTime?)>(requestStream);
+                                        var result = _serviceManager.GetProfile(arguments.Item1, arguments.Item2, token).Result;
                                         SendResponse(AmoebaFunctionResponseType.Result, id, result);
                                         break;
                                     }
                                 case AmoebaFunctionType.GetStore:
                                     {
-                                        var signature = JsonUtils.Load<Signature>(requestStream);
-                                        var result = _serviceManager.GetStore(signature, token).Result;
+                                        var arguments = JsonUtils.Load<(Signature, DateTime?)>(requestStream);
+                                        var result = _serviceManager.GetStore(arguments.Item1, arguments.Item2, token).Result;
                                         SendResponse(AmoebaFunctionResponseType.Result, id, result);
                                         break;
                                     }
                                 case AmoebaFunctionType.GetUnicastCommentMessages:
                                     {
-                                        var arguments = JsonUtils.Load<(Signature, AgreementPrivateKey)>(requestStream);
-                                        var result = _serviceManager.GetUnicastCommentMessages(arguments.Item1, arguments.Item2, token).Result;
+                                        var arguments = JsonUtils.Load<(Signature, AgreementPrivateKey, int, MessageCondition[])>(requestStream);
+                                        var result = _serviceManager.GetUnicastCommentMessages(arguments.Item1, arguments.Item2, arguments.Item3, arguments.Item4, token).Result;
                                         SendResponse(AmoebaFunctionResponseType.Result, id, result);
                                         break;
                                     }
                                 case AmoebaFunctionType.GetMulticastCommentMessages:
                                     {
-                                        var tag = JsonUtils.Load<Tag>(requestStream);
-                                        var result = _serviceManager.GetMulticastCommentMessages(tag, token).Result;
+                                        var arguments = JsonUtils.Load<(Tag, int, int, MessageCondition[])>(requestStream);
+                                        var result = _serviceManager.GetMulticastCommentMessages(arguments.Item1, arguments.Item2, arguments.Item3, arguments.Item4, token).Result;
                                         SendResponse(AmoebaFunctionResponseType.Result, id, result);
                                         break;
                                     }

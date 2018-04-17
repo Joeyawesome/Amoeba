@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
-        <AssemblyVersion>2018.4.1.214</AssemblyVersion>
+        <AssemblyVersion>2018.4.17.228</AssemblyVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -28,7 +28,4 @@
         <ProjectReference Include="..\Omnius\Omnius.Security\Omnius.Security.csproj" />
         <ProjectReference Include="..\Omnius\Omnius.Serialization\Omnius.Serialization.csproj" />
     </ItemGroup>
-
-    <Import Project="..\Omnius\Omnius.Utils\Omnius.Utils.projitems" Label="Shared" />
-
 </Project>

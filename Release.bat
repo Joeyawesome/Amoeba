@@ -27,7 +27,6 @@ cd "Publish\Core\Daemon-x86"
 del /Q /S *_x64.*
 
 cd %BAT_DIR%
-call Scripts\msbuildpath.bat
 %MS_BUILD_EXE% "Amoeba.Interface\Wpf\Amoeba.Interface.csproj" /p:Configuration=Release
 
 cd %BAT_DIR%

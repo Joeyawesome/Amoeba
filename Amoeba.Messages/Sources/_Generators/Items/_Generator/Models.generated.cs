@@ -1,18 +1,93 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.ComponentModel;
+﻿using System;
 using System.Collections.Generic;
-using Omnius.Serialization;
-using Omnius.Utils;
-using Omnius.Base;
-using System.IO;
-using System.Runtime.Serialization;
-using Omnius.Security;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Newtonsoft.Json;
+using Omnius.Base;
+using Omnius.Security;
+using Omnius.Serialization;
+using Omnius.Utils;
 
 namespace Amoeba.Messages
 {
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    public sealed partial class MessageCondition : ItemBase<MessageCondition>
+    {
+        [JsonConstructor]
+        public MessageCondition(Signature authorSignature, DateTime creationTime)
+        {
+            this.AuthorSignature = authorSignature;
+            this.CreationTime = creationTime;
+        }
+        [JsonProperty]
+        public Signature AuthorSignature { get; }
+        private DateTime _creationTime;
+        [JsonProperty]
+        public DateTime CreationTime
+        {
+            get => _creationTime;
+            private set => _creationTime = value.Normalize();
+        }
+        public override bool Equals(MessageCondition target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (this.AuthorSignature != target.AuthorSignature) return false;
+            if (this.CreationTime != target.CreationTime) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                if (this.AuthorSignature != default(Signature)) h ^= this.AuthorSignature.GetHashCode();
+                if (this.CreationTime != default(DateTime)) h ^= this.CreationTime.GetHashCode();
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+    }
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    public sealed partial class ConnectionFilter : ItemBase<ConnectionFilter>
+    {
+        [JsonConstructor]
+        public ConnectionFilter(string scheme, ConnectionType type, string proxyUri)
+        {
+            this.Scheme = scheme;
+            this.Type = type;
+            this.ProxyUri = proxyUri;
+        }
+        [JsonProperty]
+        public string Scheme { get; }
+        [JsonProperty]
+        public ConnectionType Type { get; }
+        [JsonProperty]
+        public string ProxyUri { get; }
+        public override bool Equals(ConnectionFilter target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (this.Scheme != target.Scheme) return false;
+            if (this.Type != target.Type) return false;
+            if (this.ProxyUri != target.ProxyUri) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                if (this.Scheme != default(string)) h ^= this.Scheme.GetHashCode();
+                if (this.Type != default(ConnectionType)) h ^= this.Type.GetHashCode();
+                if (this.ProxyUri != default(string)) h ^= this.ProxyUri.GetHashCode();
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+    }
     [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
     public sealed partial class CheckBlocksProgressReport : ItemBase<CheckBlocksProgressReport>
     {
@@ -460,7 +535,7 @@ namespace Amoeba.Messages
         public DateTime CreationTime
         {
             get => _creationTime;
-            private set => _creationTime = value.Trim();
+            private set => _creationTime = value.Normalize();
         }
         [JsonProperty]
         public long Length { get; }
@@ -966,3 +1041,4 @@ namespace Amoeba.Messages
     }
 
 }
+

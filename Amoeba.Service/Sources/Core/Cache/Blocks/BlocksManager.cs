@@ -398,7 +398,6 @@ namespace Amoeba.Service
             }
 
             private byte[] _sectorBuffer = new byte[SectorSize];
-            private readonly object _streamLockObject = new object();
 
             public ArraySegment<byte>? Get(Hash hash)
             {
@@ -408,12 +407,9 @@ namespace Amoeba.Service
                 {
                     ClusterInfo clusterInfo = null;
 
-                    lock (_lockObject)
+                    if (_clusterIndex.TryGetValue(hash, out clusterInfo))
                     {
-                        if (_clusterIndex.TryGetValue(hash, out clusterInfo))
-                        {
-                            clusterInfo.UpdateTime = DateTime.UtcNow;
-                        }
+                        clusterInfo.UpdateTime = DateTime.UtcNow;
                     }
 
                     if (clusterInfo == null) return null;
@@ -422,23 +418,20 @@ namespace Amoeba.Service
 
                     try
                     {
-                        lock (_streamLockObject)
+                        for (int i = 0, remain = clusterInfo.Length; i < clusterInfo.Indexes.Length; i++, remain -= SectorSize)
                         {
-                            for (int i = 0, remain = clusterInfo.Length; i < clusterInfo.Indexes.Length; i++, remain -= SectorSize)
+                            long posision = clusterInfo.Indexes[i] * SectorSize;
+                            if (posision > _fileStream.Length) throw new ArgumentOutOfRangeException();
+
+                            if (_fileStream.Position != posision)
                             {
-                                long posision = clusterInfo.Indexes[i] * SectorSize;
-                                if (posision > _fileStream.Length) throw new ArgumentOutOfRangeException();
-
-                                if (_fileStream.Position != posision)
-                                {
-                                    _fileStream.Seek(posision, SeekOrigin.Begin);
-                                }
-
-                                int length = Math.Min(remain, SectorSize);
-
-                                _fileStream.Read(_sectorBuffer, 0, _sectorBuffer.Length);
-                                Unsafe.Copy(_sectorBuffer, 0, buffer, SectorSize * i, length);
+                                _fileStream.Seek(posision, SeekOrigin.Begin);
                             }
+
+                            int length = Math.Min(remain, SectorSize);
+
+                            _fileStream.Read(_sectorBuffer, 0, _sectorBuffer.Length);
+                            Unsafe.Copy(_sectorBuffer, 0, buffer, SectorSize * i, length);
                         }
 
                         result = new ArraySegment<byte>(buffer, 0, clusterInfo.Length);
@@ -497,35 +490,32 @@ namespace Amoeba.Service
                     {
                         sectorList.AddRange(this.GetFreeSectors((value.Count + (SectorSize - 1)) / SectorSize));
 
-                        lock (_streamLockObject)
+                        for (int i = 0, remain = value.Count; i < sectorList.Count && 0 < remain; i++, remain -= SectorSize)
                         {
-                            for (int i = 0, remain = value.Count; i < sectorList.Count && 0 < remain; i++, remain -= SectorSize)
+                            long posision = sectorList[i] * SectorSize;
+
+                            if ((_fileStream.Length < posision + SectorSize))
                             {
-                                long posision = sectorList[i] * SectorSize;
+                                int unit = 1024 * 1024 * 256; // 256MB
+                                long size = Roundup((posision + SectorSize), unit);
 
-                                if ((_fileStream.Length < posision + SectorSize))
-                                {
-                                    int unit = 1024 * 1024 * 256; // 256MB
-                                    long size = Roundup((posision + SectorSize), unit);
-
-                                    _fileStream.SetLength(Math.Min(size, this.Size));
-                                }
-
-                                if (_fileStream.Position != posision)
-                                {
-                                    _fileStream.Seek(posision, SeekOrigin.Begin);
-                                }
-
-                                int length = Math.Min(remain, SectorSize);
-
-                                Unsafe.Copy(value.Array, value.Offset + (SectorSize * i), _sectorBuffer, 0, length);
-                                Unsafe.Zero(_sectorBuffer, length, _sectorBuffer.Length - length);
-
-                                _fileStream.Write(_sectorBuffer, 0, _sectorBuffer.Length);
+                                _fileStream.SetLength(Math.Min(size, this.Size));
                             }
 
-                            _fileStream.Flush();
+                            if (_fileStream.Position != posision)
+                            {
+                                _fileStream.Seek(posision, SeekOrigin.Begin);
+                            }
+
+                            int length = Math.Min(remain, SectorSize);
+
+                            Unsafe.Copy(value.Array, value.Offset + (SectorSize * i), _sectorBuffer, 0, length);
+                            Unsafe.Zero(_sectorBuffer, length, _sectorBuffer.Length - length);
+
+                            _fileStream.Write(_sectorBuffer, 0, _sectorBuffer.Length);
                         }
+
+                        _fileStream.Flush();
                     }
                     catch (SpaceNotFoundException e)
                     {
@@ -540,11 +530,7 @@ namespace Amoeba.Service
                         throw e;
                     }
 
-                    lock (_lockObject)
-                    {
-                        var clusterInfo = new ClusterInfo(sectorList.ToArray(), value.Count, DateTime.UtcNow);
-                        _clusterIndex[hash] = clusterInfo;
-                    }
+                    _clusterIndex[hash] = new ClusterInfo(sectorList.ToArray(), value.Count, DateTime.UtcNow);
 
                     // Event
                     _addedBlockEventQueue.Enqueue(hash);

@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Media.Imaging;
-using Amoeba.Interface;
 using Amoeba.Messages;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -1175,9 +1173,10 @@ namespace Amoeba.Interface
             get { return _updateTime; }
             set
             {
-                if (_updateTime != value)
+                var temp = value.Normalize();
+                if (_updateTime != temp)
                 {
-                    _updateTime = value.Trim();
+                    _updateTime = temp;
                     this.OnPropertyChanged(nameof(UpdateTime));
                 }
             }
@@ -1336,9 +1335,10 @@ namespace Amoeba.Interface
             get { return _creationTime; }
             set
             {
-                if (_creationTime != value)
+                var temp = value.Normalize();
+                if (_creationTime != temp)
                 {
-                    _creationTime = value.Trim();
+                    _creationTime = temp;
                     this.OnPropertyChanged(nameof(CreationTime));
                 }
             }
@@ -1588,9 +1588,10 @@ namespace Amoeba.Interface
             get { return _creationTime; }
             set
             {
-                if (_creationTime != value)
+                var temp = value.Normalize();
+                if (_creationTime != temp)
                 {
-                    _creationTime = value.Trim();
+                    _creationTime = temp;
                     this.OnPropertyChanged(nameof(CreationTime));
                 }
             }
@@ -1680,9 +1681,10 @@ namespace Amoeba.Interface
             get { return _creationTime; }
             set
             {
-                if (_creationTime != value)
+                var temp = value.Normalize();
+                if (_creationTime != temp)
                 {
-                    _creationTime = value.Trim();
+                    _creationTime = temp;
                     this.OnPropertyChanged(nameof(CreationTime));
                 }
             }
@@ -2107,9 +2109,10 @@ namespace Amoeba.Interface
             get { return _creationTime; }
             set
             {
-                if (_creationTime != value)
+                var temp = value.Normalize();
+                if (_creationTime != temp)
                 {
-                    _creationTime = value.Trim();
+                    _creationTime = temp;
                     this.OnPropertyChanged(nameof(CreationTime));
                 }
             }
@@ -2260,3 +2263,4 @@ namespace Amoeba.Interface
     }
 
 }
+

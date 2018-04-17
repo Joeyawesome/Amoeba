@@ -71,10 +71,17 @@
                         </ListBox.Resources>
                         <ListBoxItem Name="CloudListBoxItem">
                             <StackPanel Margin="8,0,8,0" Orientation="Horizontal">
-                                <md:PackIcon
-                                    Width="32"
-                                    Height="32"
-                                    Kind="Cloud" />
+                                <md:Badged
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    Badge="333">
+                                    <md:PackIcon
+                                        Width="32"
+                                        Height="32"
+                                        Kind="Cloud" />
+                                </md:Badged>
                                 <TextBlock
                                     Padding="16,0,0,0"
                                     VerticalAlignment="Center"

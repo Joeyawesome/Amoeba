@@ -8,7 +8,7 @@ namespace Amoeba.Service
 {
     partial class NetworkManager
     {
-        private readonly struct Node<T> : IEquatable<Node<T>>
+        public readonly struct Node<T> : IEquatable<Node<T>>
         {
             private readonly byte[] _id;
             private readonly T _value;

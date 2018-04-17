@@ -26,13 +26,13 @@ namespace Amoeba.Messages
         void AddDownload(Metadata metadata, string path, long maxLength);
         void RemoveDownload(Metadata metadata, string path);
         void ResetDownload(Metadata metadata, string path);
+        Task<BroadcastProfileMessage> GetProfile(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token);
+        Task<BroadcastStoreMessage> GetStore(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token);
+        Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, int messageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token);
+        Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, int trustMessageCountUpperLimit, int untrustMessageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token);
         Task SetProfile(ProfileContent profile, DigitalSignature digitalSignature, CancellationToken token);
         Task SetStore(StoreContent store, DigitalSignature digitalSignature, CancellationToken token);
         Task SetUnicastCommentMessage(Signature targetSignature, CommentContent comment, AgreementPublicKey agreementPublicKey, DigitalSignature digitalSignature, CancellationToken token);
         Task SetMulticastCommentMessage(Tag tag, CommentContent comment, DigitalSignature digitalSignature, TimeSpan miningTime, CancellationToken token);
-        Task<BroadcastProfileMessage> GetProfile(Signature signature, CancellationToken token);
-        Task<BroadcastStoreMessage> GetStore(Signature signature, CancellationToken token);
-        Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, CancellationToken token);
-        Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, CancellationToken token);
     }
 }

@@ -11,7 +11,7 @@
     <OldToolsVersion>2.0</OldToolsVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
-    <AssemblyVersion>2018.4.1.340</AssemblyVersion>
+    <AssemblyVersion>2018.4.17.359</AssemblyVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.Threading.Thread" Version="4.3.0" />
@@ -30,6 +30,7 @@
     <ProjectReference Include="..\Omnius\Omnius.Net\Omnius.Net.csproj" />
     <ProjectReference Include="..\Omnius\Omnius.Security\Omnius.Security.csproj" />
     <ProjectReference Include="..\Omnius\Omnius.Serialization\Omnius.Serialization.csproj" />
+    <ProjectReference Include="..\Omnius\Omnius.Utils\Omnius.Utils.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Compile Update="Sources\_Generators\Items\_Generator\Models.generated.cs">
@@ -56,5 +57,4 @@
   <ItemGroup>
     <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
   </ItemGroup>
-  <Import Project="..\Omnius\Omnius.Utils\Omnius.Utils.projitems" Label="Shared" />
 </Project>

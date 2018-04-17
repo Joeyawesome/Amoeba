@@ -1,144 +1,15 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.ComponentModel;
+﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
+using Newtonsoft.Json;
+using Omnius.Base;
+using Omnius.Security;
 using Omnius.Serialization;
 using Omnius.Utils;
-using Omnius.Base;
-using System.IO;
-using System.Runtime.Serialization;
-using Omnius.Security;
-using System.Collections.ObjectModel;
 
 namespace Amoeba.Messages
 {
-    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-    public sealed partial class ConnectionFilter : MessageBase<ConnectionFilter>
-    {
-        static ConnectionFilter()
-        {
-            ConnectionFilter.Formatter = new CustomFormatter();
-        }
-        public static readonly int MaxSchemeLength = 256;
-        public static readonly int MaxProxyUriLength = 256;
-        [JsonConstructor]
-        public ConnectionFilter(string scheme, ConnectionType type, string proxyUri)
-        {
-            if (scheme == null) throw new ArgumentNullException("scheme");
-            if (scheme.Length > MaxSchemeLength) throw new ArgumentOutOfRangeException("scheme");
-            if (proxyUri != null && proxyUri.Length > MaxProxyUriLength) throw new ArgumentOutOfRangeException("proxyUri");
-            this.Scheme = scheme;
-            this.Type = type;
-            this.ProxyUri = proxyUri;
-            this.Initialize();
-        }
-        [JsonProperty]
-        public string Scheme { get; }
-        [JsonProperty]
-        public ConnectionType Type { get; }
-        [JsonProperty]
-        public string ProxyUri { get; }
-        public override bool Equals(ConnectionFilter target)
-        {
-            if ((object)target == null) return false;
-            if (Object.ReferenceEquals(this, target)) return true;
-            if (this.Scheme != target.Scheme) return false;
-            if (this.Type != target.Type) return false;
-            if (this.ProxyUri != target.ProxyUri) return false;
-            return true;
-        }
-        private int? _hashCode;
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                int h = 0;
-                if (this.Scheme != default(string)) h ^= this.Scheme.GetHashCode();
-                if (this.Type != default(ConnectionType)) h ^= this.Type.GetHashCode();
-                if (this.ProxyUri != default(string)) h ^= this.ProxyUri.GetHashCode();
-                _hashCode = h;
-            }
-            return _hashCode.Value;
-        }
-        public override long GetMessageSize()
-        {
-            long s = 0;
-            // Scheme
-            if (this.Scheme != default(string))
-            {
-                s += MessageSizeComputer.GetSize((ulong)0);
-                s += MessageSizeComputer.GetSize(this.Scheme);
-            }
-            // Type
-            if (this.Type != default(ConnectionType))
-            {
-                s += MessageSizeComputer.GetSize((ulong)1);
-                s += MessageSizeComputer.GetSize((ulong)this.Type);
-            }
-            // ProxyUri
-            if (this.ProxyUri != default(string))
-            {
-                s += MessageSizeComputer.GetSize((ulong)2);
-                s += MessageSizeComputer.GetSize(this.ProxyUri);
-            }
-            return s;
-        }
-        private sealed class CustomFormatter : IMessageFormatter<ConnectionFilter>
-        {
-            public void Serialize(MessageStreamWriter w, ConnectionFilter value, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                // Scheme
-                if (value.Scheme != default(string))
-                {
-                    w.Write((ulong)0);
-                    w.Write(value.Scheme);
-                }
-                // Type
-                if (value.Type != default(ConnectionType))
-                {
-                    w.Write((ulong)1);
-                    w.Write((ulong)value.Type);
-                }
-                // ProxyUri
-                if (value.ProxyUri != default(string))
-                {
-                    w.Write((ulong)2);
-                    w.Write(value.ProxyUri);
-                }
-            }
-            public ConnectionFilter Deserialize(MessageStreamReader r, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                string p_scheme = default(string);
-                ConnectionType p_type = default(ConnectionType);
-                string p_proxyUri = default(string);
-                while (r.Available > 0)
-                {
-                    int id = (int)r.GetUInt64();
-                    switch (id)
-                    {
-                        case 0: //Scheme
-                            {
-                                p_scheme = r.GetString(MaxSchemeLength);
-                                break;
-                            }
-                        case 1: //Type
-                            {
-                                p_type = (ConnectionType)r.GetUInt64();
-                                break;
-                            }
-                        case 2: //ProxyUri
-                            {
-                                p_proxyUri = r.GetString(MaxProxyUriLength);
-                                break;
-                            }
-                    }
-                }
-                return new ConnectionFilter(p_scheme, p_type, p_proxyUri);
-            }
-        }
-    }
     [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
     public sealed partial class Location : MessageBase<Location>
     {
@@ -223,7 +94,7 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Uris
+                        case 0: // Uris
                             {
                                 var length = (long)r.GetUInt64();
                                 p_uris = new string[Math.Min(length, MaxUrisCount)];
@@ -326,12 +197,12 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Depth
+                        case 0: // Depth
                             {
                                 p_depth = (int)r.GetUInt64();
                                 break;
                             }
-                        case 1: //Hash
+                        case 1: // Hash
                             {
                                 var size = (long)r.GetUInt64();
                                 p_hash = Hash.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -384,7 +255,7 @@ namespace Amoeba.Messages
             {
                 int h = 0;
                 if (this.Name != default(string)) h ^= this.Name.GetHashCode();
-                if (this.Id != default(byte[])) h ^= MessageUtils.GetHashCode(this.Id);
+                if (this.Id != default(byte[])) h ^= ItemUtils.GetHashCode(this.Id);
                 _hashCode = h;
             }
             return _hashCode.Value;
@@ -434,12 +305,12 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Name
+                        case 0: // Name
                             {
                                 p_name = r.GetString(MaxNameLength);
                                 break;
                             }
-                        case 1: //Id
+                        case 1: // Id
                             {
                                 p_id = r.GetBytes(MaxIdLength);
                                 break;
@@ -677,18 +548,18 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Comment
+                        case 0: // Comment
                             {
                                 p_comment = r.GetString(MaxCommentLength);
                                 break;
                             }
-                        case 1: //ExchangePublicKey
+                        case 1: // ExchangePublicKey
                             {
                                 var size = (long)r.GetUInt64();
                                 p_exchangePublicKey = ExchangePublicKey.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 2: //TrustSignatures
+                        case 2: // TrustSignatures
                             {
                                 var length = (long)r.GetUInt64();
                                 p_trustSignatures = new Signature[Math.Min(length, MaxTrustSignaturesCount)];
@@ -699,7 +570,7 @@ namespace Amoeba.Messages
                                 }
                                 break;
                             }
-                        case 3: //DeleteSignatures
+                        case 3: // DeleteSignatures
                             {
                                 var length = (long)r.GetUInt64();
                                 p_deleteSignatures = new Signature[Math.Min(length, MaxDeleteSignaturesCount)];
@@ -710,7 +581,7 @@ namespace Amoeba.Messages
                                 }
                                 break;
                             }
-                        case 4: //Tags
+                        case 4: // Tags
                             {
                                 var length = (long)r.GetUInt64();
                                 p_tags = new Tag[Math.Min(length, MaxTagsCount)];
@@ -721,7 +592,7 @@ namespace Amoeba.Messages
                                 }
                                 break;
                             }
-                        case 5: //AgreementPublicKey
+                        case 5: // AgreementPublicKey
                             {
                                 var size = (long)r.GetUInt64();
                                 p_agreementPublicKey = AgreementPublicKey.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -730,85 +601,6 @@ namespace Amoeba.Messages
                     }
                 }
                 return new ProfileContent(p_comment, p_exchangePublicKey, p_trustSignatures, p_deleteSignatures, p_tags, p_agreementPublicKey);
-            }
-        }
-    }
-    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-    public sealed partial class CommentContent : MessageBase<CommentContent>
-    {
-        static CommentContent()
-        {
-            CommentContent.Formatter = new CustomFormatter();
-        }
-        public static readonly int MaxCommentLength = 8192;
-        [JsonConstructor]
-        public CommentContent(string comment)
-        {
-            if (comment == null) throw new ArgumentNullException("comment");
-            if (comment.Length > MaxCommentLength) throw new ArgumentOutOfRangeException("comment");
-            this.Comment = comment;
-            this.Initialize();
-        }
-        [JsonProperty]
-        public string Comment { get; }
-        public override bool Equals(CommentContent target)
-        {
-            if ((object)target == null) return false;
-            if (Object.ReferenceEquals(this, target)) return true;
-            if (this.Comment != target.Comment) return false;
-            return true;
-        }
-        private int? _hashCode;
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                int h = 0;
-                if (this.Comment != default(string)) h ^= this.Comment.GetHashCode();
-                _hashCode = h;
-            }
-            return _hashCode.Value;
-        }
-        public override long GetMessageSize()
-        {
-            long s = 0;
-            // Comment
-            if (this.Comment != default(string))
-            {
-                s += MessageSizeComputer.GetSize((ulong)0);
-                s += MessageSizeComputer.GetSize(this.Comment);
-            }
-            return s;
-        }
-        private sealed class CustomFormatter : IMessageFormatter<CommentContent>
-        {
-            public void Serialize(MessageStreamWriter w, CommentContent value, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                // Comment
-                if (value.Comment != default(string))
-                {
-                    w.Write((ulong)0);
-                    w.Write(value.Comment);
-                }
-            }
-            public CommentContent Deserialize(MessageStreamReader r, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                string p_comment = default(string);
-                while (r.Available > 0)
-                {
-                    int id = (int)r.GetUInt64();
-                    switch (id)
-                    {
-                        case 0: //Comment
-                            {
-                                p_comment = r.GetString(MaxCommentLength);
-                                break;
-                            }
-                    }
-                }
-                return new CommentContent(p_comment);
             }
         }
     }
@@ -898,7 +690,7 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Boxes
+                        case 0: // Boxes
                             {
                                 var length = (long)r.GetUInt64();
                                 p_boxes = new Box[Math.Min(length, MaxBoxesCount)];
@@ -1061,12 +853,12 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Name
+                        case 0: // Name
                             {
                                 p_name = r.GetString(MaxNameLength);
                                 break;
                             }
-                        case 1: //Seeds
+                        case 1: // Seeds
                             {
                                 var length = (long)r.GetUInt64();
                                 p_seeds = new Seed[Math.Min(length, MaxSeedsCount)];
@@ -1077,7 +869,7 @@ namespace Amoeba.Messages
                                 }
                                 break;
                             }
-                        case 2: //Boxes
+                        case 2: // Boxes
                             {
                                 var length = (long)r.GetUInt64();
                                 p_boxes = new Box[Math.Min(length, MaxBoxesCount)];
@@ -1110,7 +902,7 @@ namespace Amoeba.Messages
             if (name.Length > MaxNameLength) throw new ArgumentOutOfRangeException("name");
             this.Name = name;
             this.Length = length;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Metadata = metadata;
             this.Initialize();
         }
@@ -1220,22 +1012,22 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Name
+                        case 0: // Name
                             {
                                 p_name = r.GetString(MaxNameLength);
                                 break;
                             }
-                        case 1: //Length
+                        case 1: // Length
                             {
                                 p_length = (long)r.GetUInt64();
                                 break;
                             }
-                        case 2: //CreationTime
+                        case 2: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 3: //Metadata
+                        case 3: // Metadata
                             {
                                 var size = (long)r.GetUInt64();
                                 p_metadata = Metadata.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1244,6 +1036,85 @@ namespace Amoeba.Messages
                     }
                 }
                 return new Seed(p_name, p_length, p_creationTime, p_metadata);
+            }
+        }
+    }
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    public sealed partial class CommentContent : MessageBase<CommentContent>
+    {
+        static CommentContent()
+        {
+            CommentContent.Formatter = new CustomFormatter();
+        }
+        public static readonly int MaxCommentLength = 8192;
+        [JsonConstructor]
+        public CommentContent(string comment)
+        {
+            if (comment == null) throw new ArgumentNullException("comment");
+            if (comment.Length > MaxCommentLength) throw new ArgumentOutOfRangeException("comment");
+            this.Comment = comment;
+            this.Initialize();
+        }
+        [JsonProperty]
+        public string Comment { get; }
+        public override bool Equals(CommentContent target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (this.Comment != target.Comment) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                if (this.Comment != default(string)) h ^= this.Comment.GetHashCode();
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+        public override long GetMessageSize()
+        {
+            long s = 0;
+            // Comment
+            if (this.Comment != default(string))
+            {
+                s += MessageSizeComputer.GetSize((ulong)0);
+                s += MessageSizeComputer.GetSize(this.Comment);
+            }
+            return s;
+        }
+        private sealed class CustomFormatter : IMessageFormatter<CommentContent>
+        {
+            public void Serialize(MessageStreamWriter w, CommentContent value, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // Comment
+                if (value.Comment != default(string))
+                {
+                    w.Write((ulong)0);
+                    w.Write(value.Comment);
+                }
+            }
+            public CommentContent Deserialize(MessageStreamReader r, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                string p_comment = default(string);
+                while (r.Available > 0)
+                {
+                    int id = (int)r.GetUInt64();
+                    switch (id)
+                    {
+                        case 0: // Comment
+                            {
+                                p_comment = r.GetString(MaxCommentLength);
+                                break;
+                            }
+                    }
+                }
+                return new CommentContent(p_comment);
             }
         }
     }
@@ -1260,7 +1131,7 @@ namespace Amoeba.Messages
             if (authorSignature == null) throw new ArgumentNullException("authorSignature");
             if (value == null) throw new ArgumentNullException("value");
             this.AuthorSignature = authorSignature;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Value = value;
             this.Initialize();
         }
@@ -1356,18 +1227,18 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //AuthorSignature
+                        case 0: // AuthorSignature
                             {
                                 var size = (long)r.GetUInt64();
                                 p_authorSignature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 1: //CreationTime
+                        case 1: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 2: //Value
+                        case 2: // Value
                             {
                                 var size = (long)r.GetUInt64();
                                 p_value = ProfileContent.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1392,7 +1263,7 @@ namespace Amoeba.Messages
             if (authorSignature == null) throw new ArgumentNullException("authorSignature");
             if (value == null) throw new ArgumentNullException("value");
             this.AuthorSignature = authorSignature;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Value = value;
             this.Initialize();
         }
@@ -1488,18 +1359,18 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //AuthorSignature
+                        case 0: // AuthorSignature
                             {
                                 var size = (long)r.GetUInt64();
                                 p_authorSignature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 1: //CreationTime
+                        case 1: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 2: //Value
+                        case 2: // Value
                             {
                                 var size = (long)r.GetUInt64();
                                 p_value = StoreContent.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1527,7 +1398,7 @@ namespace Amoeba.Messages
             if (value == null) throw new ArgumentNullException("value");
             this.Tag = tag;
             this.AuthorSignature = authorSignature;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Cost = cost;
             this.Value = value;
             this.Initialize();
@@ -1664,30 +1535,30 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Tag
+                        case 0: // Tag
                             {
                                 var size = (long)r.GetUInt64();
                                 p_tag = Tag.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 1: //AuthorSignature
+                        case 1: // AuthorSignature
                             {
                                 var size = (long)r.GetUInt64();
                                 p_authorSignature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 2: //CreationTime
+                        case 2: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 3: //Cost
+                        case 3: // Cost
                             {
                                 var size = (long)r.GetUInt64();
                                 p_cost = Cost.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 4: //Value
+                        case 4: // Value
                             {
                                 var size = (long)r.GetUInt64();
                                 p_value = CommentContent.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1714,7 +1585,7 @@ namespace Amoeba.Messages
             if (value == null) throw new ArgumentNullException("value");
             this.TargetSignature = targetSignature;
             this.AuthorSignature = authorSignature;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Value = value;
             this.Initialize();
         }
@@ -1830,24 +1701,24 @@ namespace Amoeba.Messages
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //TargetSignature
+                        case 0: // TargetSignature
                             {
                                 var size = (long)r.GetUInt64();
                                 p_targetSignature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 1: //AuthorSignature
+                        case 1: // AuthorSignature
                             {
                                 var size = (long)r.GetUInt64();
                                 p_authorSignature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 2: //CreationTime
+                        case 2: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 3: //Value
+                        case 3: // Value
                             {
                                 var size = (long)r.GetUInt64();
                                 p_value = CommentContent.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1859,5 +1730,83 @@ namespace Amoeba.Messages
             }
         }
     }
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    public readonly struct Hash : IEquatable<Hash>, IMessageSize
+    {
+        public static IMessageFormatter<Hash> Formatter { get; }
+        static Hash()
+        {
+            Hash.Formatter = new CustomFormatter();
+        }
+        public static readonly int MaxValueLength = 32;
+        [JsonConstructor]
+        public Hash(HashAlgorithm algorithm, byte[] value)
+        {
+            if (value == null) throw new ArgumentNullException("value");
+            if (value.Length > MaxValueLength) throw new ArgumentOutOfRangeException("value");
+            this.Algorithm = algorithm;
+            this.Value = value;
+            {
+                int h = 0;
+                if (this.Algorithm != default(HashAlgorithm)) h ^= this.Algorithm.GetHashCode();
+                if (this.Value != default(byte[])) h ^= ItemUtils.GetHashCode(this.Value);
+                _hashCode = h;
+            }
+        }
+        [JsonProperty]
+        public HashAlgorithm Algorithm { get; }
+        [JsonProperty]
+        public byte[] Value { get; }
+        public static bool operator ==(Hash x, Hash y) => x.Equals(y);
+        public static bool operator !=(Hash x, Hash y) => !x.Equals(y);
+        public override bool Equals(object other)
+        {
+            if (!(other is Hash)) return false;
+            return this.Equals((Hash)other);
+        }
+        public bool Equals(Hash target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (this.Algorithm != target.Algorithm) return false;
+            if ((this.Value == null) != (target.Value == null)) return false;
+            if ((this.Value != null && target.Value != null)
+                && !Unsafe.Equals(this.Value, target.Value)) return false;
+            return true;
+        }
+        private readonly int _hashCode;
+        public override int GetHashCode() => _hashCode;
+        public long GetMessageSize()
+        {
+            long s = 0;
+            // Algorithm
+            s += MessageSizeComputer.GetSize((ulong)this.Algorithm);
+            // Value
+            s += MessageSizeComputer.GetSize(this.Value);
+            return s;
+        }
+        private sealed class CustomFormatter : IMessageFormatter<Hash>
+        {
+            public void Serialize(MessageStreamWriter w, Hash value, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // Algorithm
+                w.Write((ulong)value.Algorithm);
+                // Value
+                w.Write(value.Value);
+            }
+            public Hash Deserialize(MessageStreamReader r, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // Algorithm
+                var p_algorithm = (HashAlgorithm)r.GetUInt64();
+                // Value
+                var p_value = r.GetBytes(MaxValueLength);
+                return new Hash(p_algorithm, p_value);
+            }
+        }
+    }
 
 }
+

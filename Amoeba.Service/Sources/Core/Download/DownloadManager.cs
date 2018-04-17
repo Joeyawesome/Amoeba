@@ -1076,10 +1076,12 @@ namespace Amoeba.Service
                 }
 
                 _downloadTaskManager.Stop();
+                _downloadTaskManager.Dispose();
 
                 foreach (var taskManager in _decodeTaskManagers)
                 {
                     taskManager.Stop();
+                    taskManager.Dispose();
                 }
                 _decodeTaskManagers.Clear();
 

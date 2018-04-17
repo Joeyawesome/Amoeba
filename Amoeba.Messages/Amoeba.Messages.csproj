@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
-        <AssemblyVersion>2018.4.1.237</AssemblyVersion>
+        <AssemblyVersion>2018.4.16.259</AssemblyVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -14,9 +14,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Compile Remove="Sources\Core\**" />
-      <EmbeddedResource Remove="Sources\Core\**" />
-      <None Remove="Sources\Core\**" />
+        <Compile Remove="Sources\Core\**" />
+        <EmbeddedResource Remove="Sources\Core\**" />
+        <None Remove="Sources\Core\**" />
     </ItemGroup>
 
     <ItemGroup>
@@ -26,6 +26,7 @@
         <ProjectReference Include="..\Omnius\Omnius.Io\Omnius.Io.csproj" />
         <ProjectReference Include="..\Omnius\Omnius.Security\Omnius.Security.csproj" />
         <ProjectReference Include="..\Omnius\Omnius.Serialization\Omnius.Serialization.csproj" />
+        <ProjectReference Include="..\Omnius\Omnius.Utils\Omnius.Utils.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -34,9 +35,9 @@
 
     <ItemGroup>
         <Compile Update="Sources\_Generators\Messages\_Generator\Models.generated.cs">
-          <DependentUpon>Models.tt</DependentUpon>
-          <DesignTime>True</DesignTime>
-          <AutoGen>True</AutoGen>
+            <DependentUpon>Models.tt</DependentUpon>
+            <DesignTime>True</DesignTime>
+            <AutoGen>True</AutoGen>
         </Compile>
         <Compile Update="Sources\_Generators\Items\_Generator\Models.generated.cs">
             <DesignTime>True</DesignTime>
@@ -47,15 +48,13 @@
 
     <ItemGroup>
         <None Update="Sources\_Generators\Messages\_Generator\Models.tt">
-          <LastGenOutput>Models.generated.cs</LastGenOutput>
-          <Generator>TextTemplatingFileGenerator</Generator>
+            <LastGenOutput>Models.generated.cs</LastGenOutput>
+            <Generator>TextTemplatingFileGenerator</Generator>
         </None>
         <None Update="Sources\_Generators\Items\_Generator\Models.tt">
             <Generator>TextTemplatingFileGenerator</Generator>
             <LastGenOutput>Models.generated.cs</LastGenOutput>
         </None>
     </ItemGroup>
-
-    <Import Project="..\Omnius\Omnius.Utils\Omnius.Utils.projitems" Label="Shared" />
 
 </Project>

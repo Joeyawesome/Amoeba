@@ -132,17 +132,17 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //CorrectionAlgorithm
+                        case 0: // CorrectionAlgorithm
                             {
                                 p_correctionAlgorithm = (CorrectionAlgorithm)r.GetUInt64();
                                 break;
                             }
-                        case 1: //Length
+                        case 1: // Length
                             {
                                 p_length = (long)r.GetUInt64();
                                 break;
                             }
-                        case 2: //Hashes
+                        case 2: // Hashes
                             {
                                 var length = (long)r.GetUInt64();
                                 p_hashes = new Hash[Math.Min(length, MaxHashesCount)];
@@ -245,7 +245,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Groups
+                        case 0: // Groups
                             {
                                 var length = (long)r.GetUInt64();
                                 p_groups = new Group[Math.Min(length, MaxGroupsCount)];
@@ -277,7 +277,7 @@ namespace Amoeba.Service
             if (metadata == null) throw new ArgumentNullException("metadata");
             if (type.Length > MaxTypeLength) throw new ArgumentOutOfRangeException("type");
             this.Type = type;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Metadata = metadata;
             this.Certificate = certificate;
             this.Initialize();
@@ -391,23 +391,23 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Type
+                        case 0: // Type
                             {
                                 p_type = r.GetString(MaxTypeLength);
                                 break;
                             }
-                        case 1: //CreationTime
+                        case 1: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 2: //Metadata
+                        case 2: // Metadata
                             {
                                 var size = (long)r.GetUInt64();
                                 p_metadata = Metadata.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 3: //Certificate
+                        case 3: // Certificate
                             {
                                 var size = (long)r.GetUInt64();
                                 p_certificate = Certificate.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -416,6 +416,191 @@ namespace Amoeba.Service
                     }
                 }
                 return new BroadcastMetadata(p_type, p_creationTime, p_metadata, p_certificate);
+            }
+        }
+    }
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    internal sealed partial class UnicastMetadata : MessageBase<UnicastMetadata>
+    {
+        static UnicastMetadata()
+        {
+            UnicastMetadata.Formatter = new CustomFormatter();
+        }
+        public static readonly int MaxTypeLength = 256;
+        [JsonConstructor]
+        public UnicastMetadata(string type, Signature signature, DateTime creationTime, Metadata metadata, Certificate certificate)
+        {
+            if (type == null) throw new ArgumentNullException("type");
+            if (signature == null) throw new ArgumentNullException("signature");
+            if (metadata == null) throw new ArgumentNullException("metadata");
+            if (type.Length > MaxTypeLength) throw new ArgumentOutOfRangeException("type");
+            this.Type = type;
+            this.Signature = signature;
+            this.CreationTime = creationTime.Normalize();
+            this.Metadata = metadata;
+            this.Certificate = certificate;
+            this.Initialize();
+        }
+        [JsonProperty]
+        public string Type { get; }
+        [JsonProperty]
+        public Signature Signature { get; }
+        [JsonProperty]
+        public DateTime CreationTime { get; }
+        [JsonProperty]
+        public Metadata Metadata { get; }
+        [JsonProperty]
+        public Certificate Certificate { get; }
+        public override bool Equals(UnicastMetadata target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (this.Type != target.Type) return false;
+            if (this.Signature != target.Signature) return false;
+            if (this.CreationTime != target.CreationTime) return false;
+            if (this.Metadata != target.Metadata) return false;
+            if (this.Certificate != target.Certificate) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                if (this.Type != default(string)) h ^= this.Type.GetHashCode();
+                if (this.Signature != default(Signature)) h ^= this.Signature.GetHashCode();
+                if (this.CreationTime != default(DateTime)) h ^= this.CreationTime.GetHashCode();
+                if (this.Metadata != default(Metadata)) h ^= this.Metadata.GetHashCode();
+                if (this.Certificate != default(Certificate)) h ^= this.Certificate.GetHashCode();
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+        public override long GetMessageSize()
+        {
+            long s = 0;
+            // Type
+            if (this.Type != default(string))
+            {
+                s += MessageSizeComputer.GetSize((ulong)0);
+                s += MessageSizeComputer.GetSize(this.Type);
+            }
+            // Signature
+            if (this.Signature != default(Signature))
+            {
+                s += MessageSizeComputer.GetSize((ulong)1);
+                var size = this.Signature.GetMessageSize();
+                s += MessageSizeComputer.GetSize((ulong)size);
+                s += size;
+            }
+            // CreationTime
+            if (this.CreationTime != default(DateTime))
+            {
+                s += MessageSizeComputer.GetSize((ulong)2);
+                s += MessageSizeComputer.GetSize(this.CreationTime);
+            }
+            // Metadata
+            if (this.Metadata != default(Metadata))
+            {
+                s += MessageSizeComputer.GetSize((ulong)3);
+                var size = this.Metadata.GetMessageSize();
+                s += MessageSizeComputer.GetSize((ulong)size);
+                s += size;
+            }
+            // Certificate
+            if (this.Certificate != default(Certificate))
+            {
+                s += MessageSizeComputer.GetSize((ulong)4);
+                var size = this.Certificate.GetMessageSize();
+                s += MessageSizeComputer.GetSize((ulong)size);
+                s += size;
+            }
+            return s;
+        }
+        private sealed class CustomFormatter : IMessageFormatter<UnicastMetadata>
+        {
+            public void Serialize(MessageStreamWriter w, UnicastMetadata value, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // Type
+                if (value.Type != default(string))
+                {
+                    w.Write((ulong)0);
+                    w.Write(value.Type);
+                }
+                // Signature
+                if (value.Signature != default(Signature))
+                {
+                    w.Write((ulong)1);
+                    w.Write((ulong)value.Signature.GetMessageSize());
+                    Signature.Formatter.Serialize(w, value.Signature, rank + 1);
+                }
+                // CreationTime
+                if (value.CreationTime != default(DateTime))
+                {
+                    w.Write((ulong)2);
+                    w.Write(value.CreationTime);
+                }
+                // Metadata
+                if (value.Metadata != default(Metadata))
+                {
+                    w.Write((ulong)3);
+                    w.Write((ulong)value.Metadata.GetMessageSize());
+                    Metadata.Formatter.Serialize(w, value.Metadata, rank + 1);
+                }
+                // Certificate
+                if (value.Certificate != default(Certificate))
+                {
+                    w.Write((ulong)4);
+                    w.Write((ulong)value.Certificate.GetMessageSize());
+                    Certificate.Formatter.Serialize(w, value.Certificate, rank + 1);
+                }
+            }
+            public UnicastMetadata Deserialize(MessageStreamReader r, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                string p_type = default(string);
+                Signature p_signature = default(Signature);
+                DateTime p_creationTime = default(DateTime);
+                Metadata p_metadata = default(Metadata);
+                Certificate p_certificate = default(Certificate);
+                while (r.Available > 0)
+                {
+                    int id = (int)r.GetUInt64();
+                    switch (id)
+                    {
+                        case 0: // Type
+                            {
+                                p_type = r.GetString(MaxTypeLength);
+                                break;
+                            }
+                        case 1: // Signature
+                            {
+                                var size = (long)r.GetUInt64();
+                                p_signature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
+                                break;
+                            }
+                        case 2: // CreationTime
+                            {
+                                p_creationTime = r.GetDateTime();
+                                break;
+                            }
+                        case 3: // Metadata
+                            {
+                                var size = (long)r.GetUInt64();
+                                p_metadata = Metadata.Formatter.Deserialize(r.GetRange(size), rank + 1);
+                                break;
+                            }
+                        case 4: // Certificate
+                            {
+                                var size = (long)r.GetUInt64();
+                                p_certificate = Certificate.Formatter.Deserialize(r.GetRange(size), rank + 1);
+                                break;
+                            }
+                    }
+                }
+                return new UnicastMetadata(p_type, p_signature, p_creationTime, p_metadata, p_certificate);
             }
         }
     }
@@ -436,7 +621,7 @@ namespace Amoeba.Service
             if (type.Length > MaxTypeLength) throw new ArgumentOutOfRangeException("type");
             this.Type = type;
             this.Tag = tag;
-            this.CreationTime = creationTime.Trim();
+            this.CreationTime = creationTime.Normalize();
             this.Metadata = metadata;
             this.Cash = cash;
             this.Certificate = certificate;
@@ -591,35 +776,35 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Type
+                        case 0: // Type
                             {
                                 p_type = r.GetString(MaxTypeLength);
                                 break;
                             }
-                        case 1: //Tag
+                        case 1: // Tag
                             {
                                 var size = (long)r.GetUInt64();
                                 p_tag = Tag.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 2: //CreationTime
+                        case 2: // CreationTime
                             {
                                 p_creationTime = r.GetDateTime();
                                 break;
                             }
-                        case 3: //Metadata
+                        case 3: // Metadata
                             {
                                 var size = (long)r.GetUInt64();
                                 p_metadata = Metadata.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 4: //Cash
+                        case 4: // Cash
                             {
                                 var size = (long)r.GetUInt64();
                                 p_cash = Cash.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 5: //Certificate
+                        case 5: // Certificate
                             {
                                 var size = (long)r.GetUInt64();
                                 p_certificate = Certificate.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -628,191 +813,6 @@ namespace Amoeba.Service
                     }
                 }
                 return new MulticastMetadata(p_type, p_tag, p_creationTime, p_metadata, p_cash, p_certificate);
-            }
-        }
-    }
-    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-    internal sealed partial class UnicastMetadata : MessageBase<UnicastMetadata>
-    {
-        static UnicastMetadata()
-        {
-            UnicastMetadata.Formatter = new CustomFormatter();
-        }
-        public static readonly int MaxTypeLength = 256;
-        [JsonConstructor]
-        public UnicastMetadata(string type, Signature signature, DateTime creationTime, Metadata metadata, Certificate certificate)
-        {
-            if (type == null) throw new ArgumentNullException("type");
-            if (signature == null) throw new ArgumentNullException("signature");
-            if (metadata == null) throw new ArgumentNullException("metadata");
-            if (type.Length > MaxTypeLength) throw new ArgumentOutOfRangeException("type");
-            this.Type = type;
-            this.Signature = signature;
-            this.CreationTime = creationTime.Trim();
-            this.Metadata = metadata;
-            this.Certificate = certificate;
-            this.Initialize();
-        }
-        [JsonProperty]
-        public string Type { get; }
-        [JsonProperty]
-        public Signature Signature { get; }
-        [JsonProperty]
-        public DateTime CreationTime { get; }
-        [JsonProperty]
-        public Metadata Metadata { get; }
-        [JsonProperty]
-        public Certificate Certificate { get; }
-        public override bool Equals(UnicastMetadata target)
-        {
-            if ((object)target == null) return false;
-            if (Object.ReferenceEquals(this, target)) return true;
-            if (this.Type != target.Type) return false;
-            if (this.Signature != target.Signature) return false;
-            if (this.CreationTime != target.CreationTime) return false;
-            if (this.Metadata != target.Metadata) return false;
-            if (this.Certificate != target.Certificate) return false;
-            return true;
-        }
-        private int? _hashCode;
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                int h = 0;
-                if (this.Type != default(string)) h ^= this.Type.GetHashCode();
-                if (this.Signature != default(Signature)) h ^= this.Signature.GetHashCode();
-                if (this.CreationTime != default(DateTime)) h ^= this.CreationTime.GetHashCode();
-                if (this.Metadata != default(Metadata)) h ^= this.Metadata.GetHashCode();
-                if (this.Certificate != default(Certificate)) h ^= this.Certificate.GetHashCode();
-                _hashCode = h;
-            }
-            return _hashCode.Value;
-        }
-        public override long GetMessageSize()
-        {
-            long s = 0;
-            // Type
-            if (this.Type != default(string))
-            {
-                s += MessageSizeComputer.GetSize((ulong)0);
-                s += MessageSizeComputer.GetSize(this.Type);
-            }
-            // Signature
-            if (this.Signature != default(Signature))
-            {
-                s += MessageSizeComputer.GetSize((ulong)1);
-                var size = this.Signature.GetMessageSize();
-                s += MessageSizeComputer.GetSize((ulong)size);
-                s += size;
-            }
-            // CreationTime
-            if (this.CreationTime != default(DateTime))
-            {
-                s += MessageSizeComputer.GetSize((ulong)2);
-                s += MessageSizeComputer.GetSize(this.CreationTime);
-            }
-            // Metadata
-            if (this.Metadata != default(Metadata))
-            {
-                s += MessageSizeComputer.GetSize((ulong)3);
-                var size = this.Metadata.GetMessageSize();
-                s += MessageSizeComputer.GetSize((ulong)size);
-                s += size;
-            }
-            // Certificate
-            if (this.Certificate != default(Certificate))
-            {
-                s += MessageSizeComputer.GetSize((ulong)4);
-                var size = this.Certificate.GetMessageSize();
-                s += MessageSizeComputer.GetSize((ulong)size);
-                s += size;
-            }
-            return s;
-        }
-        private sealed class CustomFormatter : IMessageFormatter<UnicastMetadata>
-        {
-            public void Serialize(MessageStreamWriter w, UnicastMetadata value, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                // Type
-                if (value.Type != default(string))
-                {
-                    w.Write((ulong)0);
-                    w.Write(value.Type);
-                }
-                // Signature
-                if (value.Signature != default(Signature))
-                {
-                    w.Write((ulong)1);
-                    w.Write((ulong)value.Signature.GetMessageSize());
-                    Signature.Formatter.Serialize(w, value.Signature, rank + 1);
-                }
-                // CreationTime
-                if (value.CreationTime != default(DateTime))
-                {
-                    w.Write((ulong)2);
-                    w.Write(value.CreationTime);
-                }
-                // Metadata
-                if (value.Metadata != default(Metadata))
-                {
-                    w.Write((ulong)3);
-                    w.Write((ulong)value.Metadata.GetMessageSize());
-                    Metadata.Formatter.Serialize(w, value.Metadata, rank + 1);
-                }
-                // Certificate
-                if (value.Certificate != default(Certificate))
-                {
-                    w.Write((ulong)4);
-                    w.Write((ulong)value.Certificate.GetMessageSize());
-                    Certificate.Formatter.Serialize(w, value.Certificate, rank + 1);
-                }
-            }
-            public UnicastMetadata Deserialize(MessageStreamReader r, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                string p_type = default(string);
-                Signature p_signature = default(Signature);
-                DateTime p_creationTime = default(DateTime);
-                Metadata p_metadata = default(Metadata);
-                Certificate p_certificate = default(Certificate);
-                while (r.Available > 0)
-                {
-                    int id = (int)r.GetUInt64();
-                    switch (id)
-                    {
-                        case 0: //Type
-                            {
-                                p_type = r.GetString(MaxTypeLength);
-                                break;
-                            }
-                        case 1: //Signature
-                            {
-                                var size = (long)r.GetUInt64();
-                                p_signature = Signature.Formatter.Deserialize(r.GetRange(size), rank + 1);
-                                break;
-                            }
-                        case 2: //CreationTime
-                            {
-                                p_creationTime = r.GetDateTime();
-                                break;
-                            }
-                        case 3: //Metadata
-                            {
-                                var size = (long)r.GetUInt64();
-                                p_metadata = Metadata.Formatter.Deserialize(r.GetRange(size), rank + 1);
-                                break;
-                            }
-                        case 4: //Certificate
-                            {
-                                var size = (long)r.GetUInt64();
-                                p_certificate = Certificate.Formatter.Deserialize(r.GetRange(size), rank + 1);
-                                break;
-                            }
-                    }
-                }
-                return new UnicastMetadata(p_type, p_signature, p_creationTime, p_metadata, p_certificate);
             }
         }
     }
@@ -854,7 +854,7 @@ namespace Amoeba.Service
             if (!_hashCode.HasValue)
             {
                 int h = 0;
-                if (this.Id != default(byte[])) h ^= MessageUtils.GetHashCode(this.Id);
+                if (this.Id != default(byte[])) h ^= ItemUtils.GetHashCode(this.Id);
                 if (this.Location != default(Location)) h ^= this.Location.GetHashCode();
                 _hashCode = h;
             }
@@ -908,12 +908,12 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Id
+                        case 0: // Id
                             {
                                 p_id = r.GetBytes(MaxIdLength);
                                 break;
                             }
-                        case 1: //Location
+                        case 1: // Location
                             {
                                 var size = (long)r.GetUInt64();
                                 p_location = Location.Formatter.Deserialize(r.GetRange(size), rank + 1);
@@ -1011,7 +1011,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Locations
+                        case 0: // Locations
                             {
                                 var length = (long)r.GetUInt64();
                                 p_locations = new Location[Math.Min(length, MaxLocationsCount)];
@@ -1114,7 +1114,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Hashes
+                        case 0: // Hashes
                             {
                                 var length = (long)r.GetUInt64();
                                 p_hashes = new Hash[Math.Min(length, MaxHashesCount)];
@@ -1217,7 +1217,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Hashes
+                        case 0: // Hashes
                             {
                                 var length = (long)r.GetUInt64();
                                 p_hashes = new Hash[Math.Min(length, MaxHashesCount)];
@@ -1274,7 +1274,7 @@ namespace Amoeba.Service
             {
                 int h = 0;
                 if (this.Hash != default(Hash)) h ^= this.Hash.GetHashCode();
-                if (this.Value != default(ArraySegment<byte>)) h ^= MessageUtils.GetHashCode(this.Value);
+                if (this.Value != default(ArraySegment<byte>)) h ^= ItemUtils.GetHashCode(this.Value);
                 _hashCode = h;
             }
             return _hashCode.Value;
@@ -1327,13 +1327,13 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Hash
+                        case 0: // Hash
                             {
                                 var size = (long)r.GetUInt64();
                                 p_hash = Hash.Formatter.Deserialize(r.GetRange(size), rank + 1);
                                 break;
                             }
-                        case 1: //Value
+                        case 1: // Value
                             {
                                 p_value = r.GetRecycleBytesSegment(MaxValueLength);
                                 break;
@@ -1430,7 +1430,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Signatures
+                        case 0: // Signatures
                             {
                                 var length = (long)r.GetUInt64();
                                 p_signatures = new Signature[Math.Min(length, MaxSignaturesCount)];
@@ -1533,7 +1533,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //BroadcastMetadatas
+                        case 0: // BroadcastMetadatas
                             {
                                 var length = (long)r.GetUInt64();
                                 p_broadcastMetadatas = new BroadcastMetadata[Math.Min(length, MaxBroadcastMetadatasCount)];
@@ -1547,212 +1547,6 @@ namespace Amoeba.Service
                     }
                 }
                 return new BroadcastMetadatasResultPacket(p_broadcastMetadatas);
-            }
-        }
-    }
-    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-    internal sealed partial class MulticastMetadatasRequestPacket : MessageBase<MulticastMetadatasRequestPacket>
-    {
-        static MulticastMetadatasRequestPacket()
-        {
-            MulticastMetadatasRequestPacket.Formatter = new CustomFormatter();
-        }
-        public static readonly int MaxTagsCount = 1024 * 8;
-        [JsonConstructor]
-        public MulticastMetadatasRequestPacket(IList<Tag> tags)
-        {
-            if (tags == null) throw new ArgumentNullException("tags");
-            if (tags.Count > MaxTagsCount) throw new ArgumentOutOfRangeException("tags");
-            for (int i = 0; i < tags.Count; i++)
-            {
-                if (tags[i] == null) throw new ArgumentNullException("tags[i]");
-            }
-            this.Tags = new ReadOnlyCollection<Tag>(tags);
-            this.Initialize();
-        }
-        [JsonProperty]
-        public IReadOnlyList<Tag> Tags { get; }
-        public override bool Equals(MulticastMetadatasRequestPacket target)
-        {
-            if ((object)target == null) return false;
-            if (Object.ReferenceEquals(this, target)) return true;
-            if (!CollectionUtils.Equals(this.Tags, target.Tags)) return false;
-            return true;
-        }
-        private int? _hashCode;
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                int h = 0;
-                for (int i = 0; i < Tags.Count; i++)
-                {
-                    h ^= this.Tags[i].GetHashCode();
-                }
-                _hashCode = h;
-            }
-            return _hashCode.Value;
-        }
-        public override long GetMessageSize()
-        {
-            long s = 0;
-            // Tags
-            if (this.Tags.Count != 0)
-            {
-                s += MessageSizeComputer.GetSize((ulong)0);
-                s += MessageSizeComputer.GetSize((ulong)this.Tags.Count);
-                for (int i = 0; i < this.Tags.Count; i++)
-                {
-                    var element_size = this.Tags[i].GetMessageSize();
-                    s += MessageSizeComputer.GetSize((ulong)element_size);
-                    s += element_size;
-                }
-            }
-            return s;
-        }
-        private sealed class CustomFormatter : IMessageFormatter<MulticastMetadatasRequestPacket>
-        {
-            public void Serialize(MessageStreamWriter w, MulticastMetadatasRequestPacket value, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                // Tags
-                if (value.Tags.Count != 0)
-                {
-                    w.Write((ulong)0);
-                    w.Write((ulong)value.Tags.Count);
-                    for (int i = 0; i < value.Tags.Count; i++)
-                    {
-                        w.Write((ulong)value.Tags[i].GetMessageSize());
-                        Tag.Formatter.Serialize(w, value.Tags[i], rank + 1);
-                    }
-                }
-            }
-            public MulticastMetadatasRequestPacket Deserialize(MessageStreamReader r, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                Tag[] p_tags = Array.Empty<Tag>();
-                while (r.Available > 0)
-                {
-                    int id = (int)r.GetUInt64();
-                    switch (id)
-                    {
-                        case 0: //Tags
-                            {
-                                var length = (long)r.GetUInt64();
-                                p_tags = new Tag[Math.Min(length, MaxTagsCount)];
-                                for (int i = 0; i < p_tags.Length; i++)
-                                {
-                                    var element_size = (long)r.GetUInt64();
-                                    p_tags[i] = Tag.Formatter.Deserialize(r.GetRange(element_size), rank + 1);
-                                }
-                                break;
-                            }
-                    }
-                }
-                return new MulticastMetadatasRequestPacket(p_tags);
-            }
-        }
-    }
-    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
-    internal sealed partial class MulticastMetadatasResultPacket : MessageBase<MulticastMetadatasResultPacket>
-    {
-        static MulticastMetadatasResultPacket()
-        {
-            MulticastMetadatasResultPacket.Formatter = new CustomFormatter();
-        }
-        public static readonly int MaxMulticastMetadatasCount = 1024 * 8;
-        [JsonConstructor]
-        public MulticastMetadatasResultPacket(IList<MulticastMetadata> multicastMetadatas)
-        {
-            if (multicastMetadatas == null) throw new ArgumentNullException("multicastMetadatas");
-            if (multicastMetadatas.Count > MaxMulticastMetadatasCount) throw new ArgumentOutOfRangeException("multicastMetadatas");
-            for (int i = 0; i < multicastMetadatas.Count; i++)
-            {
-                if (multicastMetadatas[i] == null) throw new ArgumentNullException("multicastMetadatas[i]");
-            }
-            this.MulticastMetadatas = new ReadOnlyCollection<MulticastMetadata>(multicastMetadatas);
-            this.Initialize();
-        }
-        [JsonProperty]
-        public IReadOnlyList<MulticastMetadata> MulticastMetadatas { get; }
-        public override bool Equals(MulticastMetadatasResultPacket target)
-        {
-            if ((object)target == null) return false;
-            if (Object.ReferenceEquals(this, target)) return true;
-            if (!CollectionUtils.Equals(this.MulticastMetadatas, target.MulticastMetadatas)) return false;
-            return true;
-        }
-        private int? _hashCode;
-        public override int GetHashCode()
-        {
-            if (!_hashCode.HasValue)
-            {
-                int h = 0;
-                for (int i = 0; i < MulticastMetadatas.Count; i++)
-                {
-                    h ^= this.MulticastMetadatas[i].GetHashCode();
-                }
-                _hashCode = h;
-            }
-            return _hashCode.Value;
-        }
-        public override long GetMessageSize()
-        {
-            long s = 0;
-            // MulticastMetadatas
-            if (this.MulticastMetadatas.Count != 0)
-            {
-                s += MessageSizeComputer.GetSize((ulong)0);
-                s += MessageSizeComputer.GetSize((ulong)this.MulticastMetadatas.Count);
-                for (int i = 0; i < this.MulticastMetadatas.Count; i++)
-                {
-                    var element_size = this.MulticastMetadatas[i].GetMessageSize();
-                    s += MessageSizeComputer.GetSize((ulong)element_size);
-                    s += element_size;
-                }
-            }
-            return s;
-        }
-        private sealed class CustomFormatter : IMessageFormatter<MulticastMetadatasResultPacket>
-        {
-            public void Serialize(MessageStreamWriter w, MulticastMetadatasResultPacket value, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                // MulticastMetadatas
-                if (value.MulticastMetadatas.Count != 0)
-                {
-                    w.Write((ulong)0);
-                    w.Write((ulong)value.MulticastMetadatas.Count);
-                    for (int i = 0; i < value.MulticastMetadatas.Count; i++)
-                    {
-                        w.Write((ulong)value.MulticastMetadatas[i].GetMessageSize());
-                        MulticastMetadata.Formatter.Serialize(w, value.MulticastMetadatas[i], rank + 1);
-                    }
-                }
-            }
-            public MulticastMetadatasResultPacket Deserialize(MessageStreamReader r, int rank)
-            {
-                if (rank > 256) throw new FormatException();
-                MulticastMetadata[] p_multicastMetadatas = Array.Empty<MulticastMetadata>();
-                while (r.Available > 0)
-                {
-                    int id = (int)r.GetUInt64();
-                    switch (id)
-                    {
-                        case 0: //MulticastMetadatas
-                            {
-                                var length = (long)r.GetUInt64();
-                                p_multicastMetadatas = new MulticastMetadata[Math.Min(length, MaxMulticastMetadatasCount)];
-                                for (int i = 0; i < p_multicastMetadatas.Length; i++)
-                                {
-                                    var element_size = (long)r.GetUInt64();
-                                    p_multicastMetadatas[i] = MulticastMetadata.Formatter.Deserialize(r.GetRange(element_size), rank + 1);
-                                }
-                                break;
-                            }
-                    }
-                }
-                return new MulticastMetadatasResultPacket(p_multicastMetadatas);
             }
         }
     }
@@ -1842,7 +1636,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //Signatures
+                        case 0: // Signatures
                             {
                                 var length = (long)r.GetUInt64();
                                 p_signatures = new Signature[Math.Min(length, MaxSignaturesCount)];
@@ -1945,7 +1739,7 @@ namespace Amoeba.Service
                     int id = (int)r.GetUInt64();
                     switch (id)
                     {
-                        case 0: //UnicastMetadatas
+                        case 0: // UnicastMetadatas
                             {
                                 var length = (long)r.GetUInt64();
                                 p_unicastMetadatas = new UnicastMetadata[Math.Min(length, MaxUnicastMetadatasCount)];
@@ -1962,5 +1756,212 @@ namespace Amoeba.Service
             }
         }
     }
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    internal sealed partial class MulticastMetadatasRequestPacket : MessageBase<MulticastMetadatasRequestPacket>
+    {
+        static MulticastMetadatasRequestPacket()
+        {
+            MulticastMetadatasRequestPacket.Formatter = new CustomFormatter();
+        }
+        public static readonly int MaxTagsCount = 1024 * 8;
+        [JsonConstructor]
+        public MulticastMetadatasRequestPacket(IList<Tag> tags)
+        {
+            if (tags == null) throw new ArgumentNullException("tags");
+            if (tags.Count > MaxTagsCount) throw new ArgumentOutOfRangeException("tags");
+            for (int i = 0; i < tags.Count; i++)
+            {
+                if (tags[i] == null) throw new ArgumentNullException("tags[i]");
+            }
+            this.Tags = new ReadOnlyCollection<Tag>(tags);
+            this.Initialize();
+        }
+        [JsonProperty]
+        public IReadOnlyList<Tag> Tags { get; }
+        public override bool Equals(MulticastMetadatasRequestPacket target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (!CollectionUtils.Equals(this.Tags, target.Tags)) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                for (int i = 0; i < Tags.Count; i++)
+                {
+                    h ^= this.Tags[i].GetHashCode();
+                }
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+        public override long GetMessageSize()
+        {
+            long s = 0;
+            // Tags
+            if (this.Tags.Count != 0)
+            {
+                s += MessageSizeComputer.GetSize((ulong)0);
+                s += MessageSizeComputer.GetSize((ulong)this.Tags.Count);
+                for (int i = 0; i < this.Tags.Count; i++)
+                {
+                    var element_size = this.Tags[i].GetMessageSize();
+                    s += MessageSizeComputer.GetSize((ulong)element_size);
+                    s += element_size;
+                }
+            }
+            return s;
+        }
+        private sealed class CustomFormatter : IMessageFormatter<MulticastMetadatasRequestPacket>
+        {
+            public void Serialize(MessageStreamWriter w, MulticastMetadatasRequestPacket value, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // Tags
+                if (value.Tags.Count != 0)
+                {
+                    w.Write((ulong)0);
+                    w.Write((ulong)value.Tags.Count);
+                    for (int i = 0; i < value.Tags.Count; i++)
+                    {
+                        w.Write((ulong)value.Tags[i].GetMessageSize());
+                        Tag.Formatter.Serialize(w, value.Tags[i], rank + 1);
+                    }
+                }
+            }
+            public MulticastMetadatasRequestPacket Deserialize(MessageStreamReader r, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                Tag[] p_tags = Array.Empty<Tag>();
+                while (r.Available > 0)
+                {
+                    int id = (int)r.GetUInt64();
+                    switch (id)
+                    {
+                        case 0: // Tags
+                            {
+                                var length = (long)r.GetUInt64();
+                                p_tags = new Tag[Math.Min(length, MaxTagsCount)];
+                                for (int i = 0; i < p_tags.Length; i++)
+                                {
+                                    var element_size = (long)r.GetUInt64();
+                                    p_tags[i] = Tag.Formatter.Deserialize(r.GetRange(element_size), rank + 1);
+                                }
+                                break;
+                            }
+                    }
+                }
+                return new MulticastMetadatasRequestPacket(p_tags);
+            }
+        }
+    }
+    [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
+    internal sealed partial class MulticastMetadatasResultPacket : MessageBase<MulticastMetadatasResultPacket>
+    {
+        static MulticastMetadatasResultPacket()
+        {
+            MulticastMetadatasResultPacket.Formatter = new CustomFormatter();
+        }
+        public static readonly int MaxMulticastMetadatasCount = 1024 * 8;
+        [JsonConstructor]
+        public MulticastMetadatasResultPacket(IList<MulticastMetadata> multicastMetadatas)
+        {
+            if (multicastMetadatas == null) throw new ArgumentNullException("multicastMetadatas");
+            if (multicastMetadatas.Count > MaxMulticastMetadatasCount) throw new ArgumentOutOfRangeException("multicastMetadatas");
+            for (int i = 0; i < multicastMetadatas.Count; i++)
+            {
+                if (multicastMetadatas[i] == null) throw new ArgumentNullException("multicastMetadatas[i]");
+            }
+            this.MulticastMetadatas = new ReadOnlyCollection<MulticastMetadata>(multicastMetadatas);
+            this.Initialize();
+        }
+        [JsonProperty]
+        public IReadOnlyList<MulticastMetadata> MulticastMetadatas { get; }
+        public override bool Equals(MulticastMetadatasResultPacket target)
+        {
+            if ((object)target == null) return false;
+            if (Object.ReferenceEquals(this, target)) return true;
+            if (!CollectionUtils.Equals(this.MulticastMetadatas, target.MulticastMetadatas)) return false;
+            return true;
+        }
+        private int? _hashCode;
+        public override int GetHashCode()
+        {
+            if (!_hashCode.HasValue)
+            {
+                int h = 0;
+                for (int i = 0; i < MulticastMetadatas.Count; i++)
+                {
+                    h ^= this.MulticastMetadatas[i].GetHashCode();
+                }
+                _hashCode = h;
+            }
+            return _hashCode.Value;
+        }
+        public override long GetMessageSize()
+        {
+            long s = 0;
+            // MulticastMetadatas
+            if (this.MulticastMetadatas.Count != 0)
+            {
+                s += MessageSizeComputer.GetSize((ulong)0);
+                s += MessageSizeComputer.GetSize((ulong)this.MulticastMetadatas.Count);
+                for (int i = 0; i < this.MulticastMetadatas.Count; i++)
+                {
+                    var element_size = this.MulticastMetadatas[i].GetMessageSize();
+                    s += MessageSizeComputer.GetSize((ulong)element_size);
+                    s += element_size;
+                }
+            }
+            return s;
+        }
+        private sealed class CustomFormatter : IMessageFormatter<MulticastMetadatasResultPacket>
+        {
+            public void Serialize(MessageStreamWriter w, MulticastMetadatasResultPacket value, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                // MulticastMetadatas
+                if (value.MulticastMetadatas.Count != 0)
+                {
+                    w.Write((ulong)0);
+                    w.Write((ulong)value.MulticastMetadatas.Count);
+                    for (int i = 0; i < value.MulticastMetadatas.Count; i++)
+                    {
+                        w.Write((ulong)value.MulticastMetadatas[i].GetMessageSize());
+                        MulticastMetadata.Formatter.Serialize(w, value.MulticastMetadatas[i], rank + 1);
+                    }
+                }
+            }
+            public MulticastMetadatasResultPacket Deserialize(MessageStreamReader r, int rank)
+            {
+                if (rank > 256) throw new FormatException();
+                MulticastMetadata[] p_multicastMetadatas = Array.Empty<MulticastMetadata>();
+                while (r.Available > 0)
+                {
+                    int id = (int)r.GetUInt64();
+                    switch (id)
+                    {
+                        case 0: // MulticastMetadatas
+                            {
+                                var length = (long)r.GetUInt64();
+                                p_multicastMetadatas = new MulticastMetadata[Math.Min(length, MaxMulticastMetadatasCount)];
+                                for (int i = 0; i < p_multicastMetadatas.Length; i++)
+                                {
+                                    var element_size = (long)r.GetUInt64();
+                                    p_multicastMetadatas[i] = MulticastMetadata.Formatter.Deserialize(r.GetRange(element_size), rank + 1);
+                                }
+                                break;
+                            }
+                    }
+                }
+                return new MulticastMetadatasResultPacket(p_multicastMetadatas);
+            }
+        }
+    }
 
 }
+

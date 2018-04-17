@@ -1,12 +1,11 @@
 ﻿<Config>
 
-    <Class Name="ConnectionFilter">
+    <Struct Name="Hash">
         <Properties>
-            <String Name="Scheme" Id="0" Limit="256" />
-            <Varint Name="Type" Id="1" Type="ConnectionType" />
-            <String Name="ProxyUri" Id="2" IsNullable="true" Limit="256" />
+            <Varint Name="Algorithm" Id="0" Type="HashAlgorithm" />
+            <Bytes Name="Value" Id="1" Limit="32" />
         </Properties>
-    </Class>
+    </Struct>
 
     <Class Name="Location">
         <Properties>
@@ -59,12 +58,6 @@
         </Properties>
     </Class>
 
-    <Class Name="CommentContent">
-        <Properties>
-            <String Name="Comment" Id="0" Limit="8192" />
-        </Properties>
-    </Class>
-
     <Class Name="StoreContent">
         <Properties>
             <Array Name="Boxes" Id="0" Limit="1024 * 8">
@@ -97,6 +90,12 @@
             <Varint Name="Length" Id="1" Type="long" />
             <DateTime Name="CreationTime" Id="2" />
             <Message Name="Metadata" Id="3" Type="Metadata" />
+        </Properties>
+    </Class>
+
+    <Class Name="CommentContent">
+        <Properties>
+            <String Name="Comment" Id="0" Limit="8192" />
         </Properties>
     </Class>
 

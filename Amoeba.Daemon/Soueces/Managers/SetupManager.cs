@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -18,7 +19,7 @@ namespace Amoeba.Daemon
 {
     sealed class SetupManager : ManagerBase
     {
-        WatchTimer _timer;
+        private WatchTimer _timer;
 
         private readonly object _lockObject = new object();
         private volatile bool _isDisposed;
@@ -32,17 +33,17 @@ namespace Amoeba.Daemon
             AppDomain.CurrentDomain.UnhandledException += this.Program_UnhandledException;
             Thread.GetDomain().UnhandledException += this.Program_UnhandledException;
 
-            // コマンドライン引数を解析。
-            var options = CommandLine.Parser.Default.ParseArguments<AmoebaDaemonOptions>(Environment.GetCommandLineArgs())
-                .MapResult(
-                    (AmoebaDaemonOptions x) => x,
-                    errs => null);
-            if (options == null) return;
-
+#if !DEBUG
             // Tomlファイルを読み込み。
             DaemonConfig config = null;
             {
-#if !DEBUG
+                // コマンドライン引数を解析。
+                var options = CommandLine.Parser.Default.ParseArguments<AmoebaDaemonOptions>(Environment.GetCommandLineArgs())
+                    .MapResult(
+                        (AmoebaDaemonOptions x) => x,
+                        errs => null);
+                if (options == null) return;
+
                 if (File.Exists(options.ConfigFilePath))
                 {
                     var tomlSettings = TomlSettings.Create(builder => builder
@@ -53,20 +54,24 @@ namespace Amoeba.Daemon
 
                     config = Toml.ReadFile<DaemonConfig>(options.ConfigFilePath, tomlSettings);
                 }
+
+                if (config == null) return;
+            }
 #else
-                var basePath = "../../";
+            DaemonConfig config = null;
+            {
+                var basePath = Environment.GetCommandLineArgs()[0];
+                if (!Directory.Exists(basePath)) Directory.CreateDirectory(basePath);
 
                 config = new DaemonConfig(
                     new Version(0, 0, 0),
-                    new DaemonConfig.CommunicationConfig("tcp:127.0.0.1:4040"),
-                    new DaemonConfig.CacheConfig(Path.Combine("E:", "Test", "Cache.blocks")),
+                    new DaemonConfig.CacheConfig(Path.Combine(basePath, "Cache.blocks")),
                     new DaemonConfig.PathsConfig(
                         Path.Combine(basePath, "Temp"),
-                        Path.Combine(basePath, "Config", "Service"),
+                        Path.Combine(basePath, "Config/Service"),
                         Path.Combine(basePath, "Log")));
-#endif
             }
-            if (config == null) return;
+#endif
 
             // 既定のフォルダを作成する。
             {
@@ -104,6 +109,7 @@ namespace Amoeba.Daemon
             // ログファイルを設定する。
             this.Setting_Log(config);
 
+            // 30分置きにLOHの圧縮を実行する。
             _timer = new WatchTimer(() =>
             {
                 GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
@@ -111,38 +117,88 @@ namespace Amoeba.Daemon
             });
             _timer.Start(new TimeSpan(0, 30, 0));
 
+            Socket targetSocket = null;
+
             // サービス開始。
             try
             {
+#if !DEBUG
+                for (int i = 50000; i < 60000; i++)
+                {
+                    try
+                    {
+                        using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                        {
+                            var endpoint = new IPEndPoint(IPAddress.Loopback, i);
+                            socket.Bind(endpoint);
+                            socket.Listen(1);
+
+                            Console.Out.WriteLine(endpoint.ToString());
+
+                            var sw = Stopwatch.StartNew();
+
+                            for (; ; )
+                            {
+                                if (socket.Poll(0, SelectMode.SelectRead)) break;
+                                if (sw.Elapsed.TotalSeconds > 30) return;
+
+                                Thread.Sleep(1000);
+                            }
+
+                            targetSocket = socket.Accept();
+
+                            break;
+                        }
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
+#else
+                try
+                {
+                    using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+                    {
+                        var endpoint = new IPEndPoint(IPAddress.Loopback, 60000);
+                        socket.Bind(endpoint);
+                        socket.Listen(1);
+
+                        Console.Out.WriteLine(endpoint.ToString());
+
+                        var sw = Stopwatch.StartNew();
+
+                        for (; ; )
+                        {
+                            if (socket.Poll(0, SelectMode.SelectRead)) break;
+                            if (sw.Elapsed.TotalSeconds > 30) return;
+
+                            Thread.Sleep(1000);
+                        }
+
+                        targetSocket = socket.Accept();
+                    }
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
+                }
+#endif
+
                 using (var bufferManager = new BufferManager(1024 * 1024 * 1024))
                 using (var serviceManager = new ServiceManager(config.Paths.ConfigDirectoryPath, config.Cache.BlocksFilePath, bufferManager))
+                using (var daemonManager = new AmoebaDaemonManager<ServiceManager>(targetSocket, serviceManager, bufferManager))
                 {
-                    IPEndPoint endpoint;
+                    try
                     {
-                        var info = UriUtils.Parse(config.Communication.ListenUri);
-                        endpoint = new IPEndPoint(IPAddress.Parse(info.GetValue<string>("Address")), info.GetValue<int>("Port"));
+                        daemonManager.Watch();
                     }
-
-                    var tcpListener = new TcpListener(endpoint);
-                    tcpListener.Start();
-
-                    using (var socket = tcpListener.AcceptSocket())
-                    using (var server = new AmoebaDaemonManager<ServiceManager>(socket, serviceManager, bufferManager))
+                    catch (Exception e)
                     {
-                        try
-                        {
-                            server.Watch();
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e);
+                        Log.Error(e);
 
-                            Console.WriteLine(e.Message);
-                        }
+                        Console.WriteLine(e.Message);
                     }
-
-                    tcpListener.Stop();
-                    tcpListener.Server.Dispose();
                 }
             }
             catch (Exception e)
@@ -150,6 +206,13 @@ namespace Amoeba.Daemon
                 Log.Error(e);
 
                 Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                if (targetSocket != null)
+                {
+                    targetSocket.Dispose();
+                }
             }
         }
 
@@ -287,7 +350,7 @@ namespace Amoeba.Daemon
                         }
                         catch (Exception)
                         {
-
+                            break;
                         }
                     }
                 }
@@ -331,8 +394,12 @@ namespace Amoeba.Daemon
 
             if (isDisposing)
             {
-                _timer.Stop();
-                _timer.Dispose();
+                if (_timer != null)
+                {
+                    _timer.Stop();
+                    _timer.Dispose();
+                    _timer = null;
+                }
             }
         }
     }

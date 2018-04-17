@@ -8,7 +8,7 @@ namespace Amoeba.Service
 {
     partial class NetworkManager
     {
-        sealed class RouteTableMethods
+        public sealed class RouteTableMethods
         {
             private static byte[] _distanceHashTable = new byte[256];
 
@@ -53,7 +53,6 @@ namespace Amoeba.Service
 
             public static IEnumerable<Node<T>> Search<T>(byte[] baseId, byte[] targetId, IEnumerable<Node<T>> nodeList, int count)
             {
-                if (baseId == null) throw new ArgumentNullException(nameof(baseId));
                 if (targetId == null) throw new ArgumentNullException(nameof(targetId));
                 if (nodeList == null) throw new ArgumentNullException(nameof(nodeList));
                 if (count == 0) return Array.Empty<Node<T>>();

@@ -134,72 +134,79 @@ namespace Amoeba.Service
 
             private void WatchThread()
             {
-                for (; ; )
+                try
                 {
-                    var config = this.Config;
-
-                    string i2pUri = null;
-
-                    if (config.IsEnabled)
+                    for (; ; )
                     {
-                        if ((_samManager == null || !_samManager.IsConnected)
-                            || _watchSamBridgeUri != config.SamBridgeUri)
+                        var config = this.Config;
+
+                        string i2pUri = null;
+
+                        if (config.IsEnabled)
                         {
-                            try
+                            if ((_samManager == null || !_samManager.IsConnected)
+                                || _watchSamBridgeUri != config.SamBridgeUri)
                             {
-                                var result = UriUtils.Parse(config.SamBridgeUri);
-                                if (result == null) throw new Exception();
-
-                                string scheme = result.GetValue<string>("Scheme");
-                                if (scheme != "tcp") throw new Exception();
-
-                                string address = result.GetValue<string>("Address");
-                                int port = result.GetValueOrDefault<int>("Port", () => 7656);
-
-                                if (_samManager != null)
+                                try
                                 {
-                                    _samManager.Dispose();
-                                    _samManager = null;
+                                    var result = UriUtils.Parse(config.SamBridgeUri);
+                                    if (result == null) throw new Exception();
+
+                                    string scheme = result.GetValue<string>("Scheme");
+                                    if (scheme != "tcp") throw new Exception();
+
+                                    string address = result.GetValue<string>("Address");
+                                    int port = result.GetValueOrDefault<int>("Port", () => 7656);
+
+                                    if (_samManager != null)
+                                    {
+                                        _samManager.Dispose();
+                                        _samManager = null;
+                                    }
+
+                                    _samManager = new SamManager(address, port, "Amoeba");
+                                    _samManager.Start();
+
+                                    _watchSamBridgeUri = config.SamBridgeUri;
                                 }
-
-                                _samManager = new SamManager(address, port, "Amoeba");
-                                _samManager.Start();
-
-                                _watchSamBridgeUri = config.SamBridgeUri;
+                                catch (Exception)
+                                {
+                                    if (_samManager != null)
+                                    {
+                                        _samManager.Dispose();
+                                        _samManager = null;
+                                    }
+                                }
                             }
-                            catch (Exception)
+
+                            if (_samManager.Base32Address != null)
                             {
-                                if (_samManager != null)
-                                {
-                                    _samManager.Dispose();
-                                    _samManager = null;
-                                }
+                                i2pUri = string.Format("i2p:{0}", _samManager.Base32Address);
+                            }
+                        }
+                        else
+                        {
+                            if (_samManager != null)
+                            {
+                                _samManager.Dispose();
+                                _samManager = null;
                             }
                         }
 
-                        if (_samManager.Base32Address != null)
+                        lock (_lockObject)
                         {
-                            i2pUri = string.Format("i2p:{0}", _samManager.Base32Address);
+                            if (this.Config != config) continue;
+
+                            _locationUris.Clear();
+                            if (i2pUri != null) _locationUris.Add(i2pUri);
                         }
-                    }
-                    else
-                    {
-                        if (_samManager != null)
-                        {
-                            _samManager.Dispose();
-                            _samManager = null;
-                        }
-                    }
 
-                    lock (_lockObject)
-                    {
-                        if (this.Config != config) continue;
-
-                        _locationUris.Clear();
-                        if (i2pUri != null) _locationUris.Add(i2pUri);
+                        return;
                     }
-
-                    return;
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
                 }
             }
 

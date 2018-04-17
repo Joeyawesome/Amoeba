@@ -455,7 +455,7 @@ namespace Amoeba.Interface
                         }
                         catch (Exception)
                         {
-
+                            break;
                         }
                     }
                 }

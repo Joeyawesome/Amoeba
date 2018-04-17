@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -23,7 +24,7 @@ namespace Amoeba.Rpc
 
         private Random _random = new Random();
 
-        private LockedHashDictionary<int, WaitQueue<ResponseInfo>> _queueMap = new LockedHashDictionary<int, WaitQueue<ResponseInfo>>();
+        private LockedHashDictionary<int, BlockingCollection<ResponseInfo>> _queueMap = new LockedHashDictionary<int, BlockingCollection<ResponseInfo>>();
 
         private readonly object _lockObject = new object();
         private volatile bool _isDisposed;
@@ -71,7 +72,7 @@ namespace Amoeba.Rpc
 
             if (_queueMap.TryGetValue(id, out var queue))
             {
-                queue.Enqueue(new ResponseInfo() { Type = type, Stream = new RangeStream(responseStream) });
+                queue.Add(new ResponseInfo() { Type = type, Stream = new RangeStream(responseStream) });
             }
         }
 
@@ -97,10 +98,10 @@ namespace Amoeba.Rpc
             }
         }
 
-        private (int, WaitQueue<ResponseInfo>) Send<TArgument>(AmoebaFunctionType type, TArgument argument)
+        private (int, BlockingCollection<ResponseInfo>) Send<TArgument>(AmoebaFunctionType type, TArgument argument)
         {
             int id = this.CreateId();
-            var queue = new WaitQueue<ResponseInfo>();
+            var queue = new BlockingCollection<ResponseInfo>(new ConcurrentQueue<ResponseInfo>());
 
             _queueMap.Add(id, queue);
 
@@ -159,7 +160,7 @@ namespace Amoeba.Rpc
                 {
                     for (; ; )
                     {
-                        var info = queue.Dequeue();
+                        var info = queue.Take();
 
                         try
                         {
@@ -206,7 +207,7 @@ namespace Amoeba.Rpc
             {
                 using (var register = token.Register(() => this.Cancel(id)))
                 {
-                    var info = queue.Dequeue();
+                    var info = queue.Take();
 
                     try
                     {
@@ -250,7 +251,7 @@ namespace Amoeba.Rpc
                 {
                     for (; ; )
                     {
-                        var info = queue.Dequeue();
+                        var info = queue.Take();
 
                         try
                         {
@@ -297,7 +298,7 @@ namespace Amoeba.Rpc
             {
                 using (var register = token.Register(() => this.Cancel(id)))
                 {
-                    var info = queue.Dequeue();
+                    var info = queue.Take();
 
                     try
                     {
@@ -512,6 +513,58 @@ namespace Amoeba.Rpc
             }
         }
 
+        public Task<BroadcastProfileMessage> GetProfile(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return Task.Run(() =>
+                {
+                    return this.Function<BroadcastProfileMessage, Signature>(AmoebaFunctionType.GetProfile, signature, token);
+                });
+            }
+        }
+
+        public Task<BroadcastStoreMessage> GetStore(Signature signature, DateTime? creationTimeLowerLimit, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return Task.Run(() =>
+                {
+                    return this.Function<BroadcastStoreMessage, Signature>(AmoebaFunctionType.GetStore, signature, token);
+                });
+            }
+        }
+
+        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, int messageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return Task.Run(() =>
+                {
+                    return this.Function<IEnumerable<UnicastCommentMessage>, (Signature, AgreementPrivateKey)>(AmoebaFunctionType.GetUnicastCommentMessages, (signature, agreementPrivateKey), token);
+                });
+            }
+        }
+
+        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, int trustMessageCountUpperLimit, int untrustMessageCountUpperLimit, IEnumerable<MessageCondition> conditions, CancellationToken token)
+        {
+            this.Check();
+
+            lock (_lockObject)
+            {
+                return Task.Run(() =>
+                {
+                    return this.Function<IEnumerable<MulticastCommentMessage>, Tag>(AmoebaFunctionType.GetMulticastCommentMessages, tag, token);
+                });
+            }
+        }
+
         public Task SetProfile(ProfileContent profile, DigitalSignature digitalSignature, CancellationToken token)
         {
             this.Check();
@@ -560,58 +613,6 @@ namespace Amoeba.Rpc
                 return Task.Run(() =>
                 {
                     this.Action(AmoebaFunctionType.SetMulticastCommentMessage, (tag, comment, digitalSignature, miningTimeSpan), token);
-                });
-            }
-        }
-
-        public Task<BroadcastProfileMessage> GetProfile(Signature signature, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return Task.Run(() =>
-                {
-                    return this.Function<BroadcastProfileMessage, Signature>(AmoebaFunctionType.GetProfile, signature, token);
-                });
-            }
-        }
-
-        public Task<BroadcastStoreMessage> GetStore(Signature signature, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return Task.Run(() =>
-                {
-                    return this.Function<BroadcastStoreMessage, Signature>(AmoebaFunctionType.GetStore, signature, token);
-                });
-            }
-        }
-
-        public Task<IEnumerable<UnicastCommentMessage>> GetUnicastCommentMessages(Signature signature, AgreementPrivateKey agreementPrivateKey, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return Task.Run(() =>
-                {
-                    return this.Function<IEnumerable<UnicastCommentMessage>, (Signature, AgreementPrivateKey)>(AmoebaFunctionType.GetUnicastCommentMessages, (signature, agreementPrivateKey), token);
-                });
-            }
-        }
-
-        public Task<IEnumerable<MulticastCommentMessage>> GetMulticastCommentMessages(Tag tag, CancellationToken token)
-        {
-            this.Check();
-
-            lock (_lockObject)
-            {
-                return Task.Run(() =>
-                {
-                    return this.Function<IEnumerable<MulticastCommentMessage>, Tag>(AmoebaFunctionType.GetMulticastCommentMessages, tag, token);
                 });
             }
         }

@@ -354,53 +354,60 @@ namespace Amoeba.Service
 
             private void WatchListenerThread()
             {
-                for (; ; )
+                try
                 {
-                    var config = this.Config;
-
-                    foreach (var (uri, tcpListener) in _tcpListeners.ToArray())
+                    for (; ; )
                     {
-                        if (config.ListenUris.Contains(uri)) continue;
+                        var config = this.Config;
 
-                        tcpListener.Stop();
-                        _tcpListeners.Remove(uri);
-                    }
-
-                    foreach (string uri in config.ListenUris)
-                    {
-                        if (_tcpListeners.ContainsKey(uri)) continue;
-
-                        var result = UriUtils.Parse(uri);
-                        if (result == null) throw new Exception();
-
-                        string scheme = result.GetValue<string>("Scheme");
-                        string address = result.GetValue<string>("Address");
-                        int port = result.GetValueOrDefault<int>("Port", () => 4050);
-
-                        if (scheme == "tcp")
+                        foreach (var (uri, tcpListener) in _tcpListeners.ToArray())
                         {
-                            try
-                            {
-                                var listener = new TcpListener(IPAddress.Parse(address), port);
-                                listener.Start(3);
-                                _tcpListeners[uri] = listener;
-                            }
-                            catch (Exception)
-                            {
+                            if (config.ListenUris.Contains(uri)) continue;
 
+                            tcpListener.Stop();
+                            _tcpListeners.Remove(uri);
+                        }
+
+                        foreach (string uri in config.ListenUris)
+                        {
+                            if (_tcpListeners.ContainsKey(uri)) continue;
+
+                            var result = UriUtils.Parse(uri);
+                            if (result == null) throw new Exception();
+
+                            string scheme = result.GetValue<string>("Scheme");
+                            string address = result.GetValue<string>("Address");
+                            int port = result.GetValueOrDefault<int>("Port", () => 4050);
+
+                            if (scheme == "tcp")
+                            {
+                                try
+                                {
+                                    var listener = new TcpListener(IPAddress.Parse(address), port);
+                                    listener.Start(3);
+                                    _tcpListeners[uri] = listener;
+                                }
+                                catch (Exception)
+                                {
+
+                                }
                             }
                         }
+
+                        lock (_lockObject)
+                        {
+                            if (this.Config != config) continue;
+
+                            _locationUris.Clear();
+                            _locationUris.AddRange(config.LocationUris);
+                        }
+
+                        return;
                     }
-
-                    lock (_lockObject)
-                    {
-                        if (this.Config != config) continue;
-
-                        _locationUris.Clear();
-                        _locationUris.AddRange(config.LocationUris);
-                    }
-
-                    return;
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e);
                 }
             }
 
